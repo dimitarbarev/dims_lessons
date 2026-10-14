@@ -3,6 +3,8 @@
 import { useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { butterButton, Field, primaryButton, SelectField } from "@/components/fields";
+import { InviteLink } from "@/components/invite-link";
+import { PhoneLink } from "@/components/phone-link";
 import { saveSettings } from "@/lib/actions";
 
 export function SettingsView({
@@ -44,9 +46,13 @@ export function SettingsView({
           )}
         </div>
         <p className="mt-2 max-w-md text-soft">{t("lead")}</p>
-        <p className="mt-4 text-sm tracking-[0.28em] text-soft">
-          {t("code")} {teacher.code}
+        <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm tracking-[0.28em] text-soft">
+          <span>
+            {t("code")} {teacher.code}
+          </span>
+          <InviteLink code={teacher.code} label={t("invite")} copiedLabel={t("inviteCopied")} />
         </p>
+        <p className="mt-2 max-w-md text-sm text-soft">{t("inviteLead")}</p>
         {notice}
         {editing ? (
           <form action={saveSettings} className="mt-6 grid max-w-lg gap-4 rounded-[28px] bg-ivory p-5 shadow-card">
@@ -71,7 +77,7 @@ export function SettingsView({
         ) : (
           <dl className="mt-8 max-w-lg">
             <Fact label={t("email")} value={teacher.email} />
-            <Fact label={t("phone")} value={teacher.phone || "—"} />
+            <Fact label={t("phone")} value={teacher.phone ? <PhoneLink phone={teacher.phone} /> : "—"} />
             <Fact label={t("currency")} value={teacher.currency} />
           </dl>
         )}
@@ -80,7 +86,7 @@ export function SettingsView({
   );
 }
 
-function Fact({ label, value }: { label: string; value: string }) {
+function Fact({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-6 border-t border-ink/10 py-3">
       <dt className="text-sm text-soft">{label}</dt>

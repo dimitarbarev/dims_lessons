@@ -96,6 +96,8 @@ export default async function TodayPage({
                     placeLabel={clientCopy("place")}
                     materialsLabel={clientCopy("materials")}
                     homeworkLabel={clientCopy("homework")}
+                    materialsPlaceholder={clientCopy("materialsEmpty")}
+                    homeworkPlaceholder={clientCopy("homeworkEmpty")}
                     optionalLabel={common("optional")}
                     platforms={options.platforms}
                     places={options.locations}

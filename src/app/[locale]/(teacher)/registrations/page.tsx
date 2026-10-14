@@ -1,11 +1,16 @@
 import { getTranslations } from "next-intl/server";
+import type { ReactNode } from "react";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorBanner } from "@/components/error-banner";
 import { butterButton, primaryButton } from "@/components/fields";
+import { InviteLink } from "@/components/invite-link";
+import { PhoneLink } from "@/components/phone-link";
 import { SignupBoard } from "@/components/signup-board";
 import { acceptRegistration, declineRegistration } from "@/lib/actions";
-import { listPendingRegistrations } from "@/lib/db";
+import { requireSession } from "@/lib/auth";
+import { getTeacherById, listPendingRegistrations } from "@/lib/db";
+import { formatCode } from "@/lib/format";
 import { choiceOptions, labelOf } from "@/lib/labels";
 
 export default async function RegistrationsPage({
@@ -14,6 +19,8 @@ export default async function RegistrationsPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { error } = await searchParams;
+  const session = await requireSession("teacher");
+  const teacher = getTeacherById(session.user_id);
   const t = await getTranslations("signups");
   const client = await getTranslations("client");
   const options = await choiceOptions();
@@ -40,7 +47,7 @@ export default async function RegistrationsPage({
           <Fact label={client("ambitions")} value={row.ambitions || "—"} />
           <Fact label={t("parent")} value={row.parent_name} />
           <Fact label={client("parentEmail")} value={row.parent_email} />
-          <Fact label={client("parentPhone")} value={row.parent_phone || "—"} />
+          <Fact label={client("parentPhone")} value={row.parent_phone ? <PhoneLink phone={row.parent_phone} /> : "—"} />
           <Fact label={client("parentOccupation")} value={row.parent_occupation || "—"} />
           <Fact label={client("parentSocial")} value={row.parent_social || "—"} />
         </dl>
@@ -69,7 +76,13 @@ export default async function RegistrationsPage({
   return (
     <div>
       <p className="kicker">{t("kicker")}</p>
-      <h1 className="mt-2 mb-6 font-display text-4xl sm:text-5xl">{t("title")}</h1>
+      <div className="mt-2 mb-6 flex flex-wrap items-end justify-between gap-3">
+        <h1 className="font-display text-4xl sm:text-5xl">{t("title")}</h1>
+        {teacher?.public_code ? (
+          <InviteLink code={formatCode(teacher.public_code)} label={t("invite")} copiedLabel={t("inviteCopied")} />
+        ) : null}
+      </div>
+      <p className="-mt-4 mb-6 max-w-md text-sm text-soft">{t("inviteLead")}</p>
       <ErrorBanner code={error} />
       {rows.length === 0 ? (
         <EmptyState title={t("emptyTitle")} lead={t("emptyLead")} />
@@ -89,7 +102,7 @@ export default async function RegistrationsPage({
   );
 }
 
-function Fact({ label, value }: { label: string; value: string }) {
+function Fact({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-6 border-t border-ink/10 py-3">
       <dt className="text-sm text-soft">{label}</dt>

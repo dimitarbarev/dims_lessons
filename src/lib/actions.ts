@@ -29,6 +29,7 @@ import {
   getPayment,
   getRegistration,
   getParentByCode,
+  getTeacher,
   getTeacherByEmail,
   insertClient,
   insertFeedbackNote,
@@ -44,6 +45,7 @@ import {
   setRegistrationStatus,
   setStudentPin,
   updateClient,
+  updateLesson,
   updateParentLocale,
   updateTeacher,
   updateTeacherLocale,
@@ -135,14 +137,21 @@ export async function rememberLocale(next: string) {
 }
 
 export async function submitRegistration(form: FormData) {
-  const parentName = field(form, "parentName");
-  const email = field(form, "email").toLowerCase();
+  const paysSelf = field(form, "paysSelf") === "1";
+  const code = field(form, "teacherCode").replace(/\D/g, "");
+  const teacher = getTeacher();
   const childName = field(form, "childName");
+  const email = field(form, "email").toLowerCase();
+  const parentName = paysSelf ? childName : field(form, "parentName");
   const subject = field(form, "subject") || "math";
-  if (!parentName || !childName || !isEmail(email) || !isOneOf(SUBJECTS, subject)) {
-    await go("/register", { error: "required" });
+  const back = { code, pays: paysSelf ? "1" : "0" };
+  if (!teacher?.public_code || code !== teacher.public_code) {
+    await go("/register", { error: "unknownCode", ...back });
   }
-  if (emailTaken(email)) await go("/register", { error: "emailTaken" });
+  if (!parentName || !childName || !isEmail(email) || !isOneOf(SUBJECTS, subject)) {
+    await go("/register", { error: "required", ...back });
+  }
+  if (emailTaken(email)) await go("/register", { error: "emailTaken", ...back });
 
   insertRegistration({
     parent_name: parentName,
@@ -157,6 +166,7 @@ export async function submitRegistration(form: FormData) {
     ambitions: field(form, "ambitions"),
     subject,
     portrait: field(form, "portrait") === "boy" ? "boy" : "girl",
+    pays_self: paysSelf ? 1 : 0,
   });
   refresh();
   await go("/register", { sent: "1" });
@@ -285,7 +295,32 @@ export async function logDetailedLesson(form: FormData) {
     durationHours: must(hours),
   });
   refresh();
-  await go(`/clients/${client.id}`);
+  await go(`/clients/${client.id}`, { panel: "lessons" });
+}
+
+export async function updateLessonAction(form: FormData) {
+  const found = getLesson(field(form, "lessonId"));
+  if (!found) await go("/today");
+  const lesson = must(found);
+  const client = await ownedClient(lesson.client_id);
+  const picked = choices(form);
+  const date = field(form, "date");
+  const hours = parseHours(field(form, "duration") || "1");
+  if (!picked || !/^\d{4}-\d{2}-\d{2}$/.test(date) || hours === null) {
+    await go(`/clients/${client.id}`, { error: "required", panel: "lessons" });
+  }
+  const choice = must(picked);
+  updateLesson(lesson.id, {
+    occurredOn: date,
+    subject: choice.subject,
+    platform: choice.platform,
+    location: choice.location,
+    materials: field(form, "materials").slice(0, 2000),
+    homework: field(form, "homework").slice(0, 2000),
+    durationHours: must(hours),
+  });
+  refresh();
+  await go(`/clients/${client.id}`, { panel: "lessons", saved: "1" });
 }
 
 export async function removeLesson(form: FormData) {
@@ -465,12 +500,14 @@ export async function acceptRegistration(form: FormData) {
     ambitions: registration.ambitions,
     portrait: registration.portrait === "boy" ? "boy" : "girl",
   });
+  const created = getClient(clientId);
   const parent = upsertParent({
-    name: registration.parent_name,
+    name: registration.pays_self ? registration.child_name : registration.parent_name,
     email: registration.parent_email,
     phone: registration.parent_phone,
     social: registration.parent_social,
     occupation: registration.parent_occupation,
+    publicCode: registration.pays_self ? created?.public_code : undefined,
   });
   linkParent(clientId, parent.id);
   setRegistrationStatus(registration.id, "accepted");
@@ -493,6 +530,14 @@ export async function archiveFeedback(form: FormData) {
   if (!id) await go("/feedback");
   setFeedbackArchived(kind, id, field(form, "archived") !== "0");
   refresh();
+  const back = field(form, "back");
+  if (back.startsWith("/clients/")) {
+    const clientId = back.slice("/clients/".length).split("/")[0] ?? "";
+    if (clientId) {
+      await ownedClient(clientId);
+      await go(`/clients/${clientId}`, { panel: "feedback" });
+    }
+  }
   await go("/feedback");
 }
 
@@ -523,7 +568,7 @@ export async function sendFeedbackRequest(form: FormData) {
     openQuestion: field(form, "question") || "What should I change?",
   });
   refresh();
-  await go(`/clients/${client.id}`, { saved: "1" });
+  await go(`/clients/${client.id}`, { panel: "feedback", saved: "1" });
 }
 
 export async function addFeedbackNote(form: FormData) {

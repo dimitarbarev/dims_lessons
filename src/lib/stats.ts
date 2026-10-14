@@ -40,6 +40,27 @@ export function summarize(
   };
 }
 
+export function packFigure(mode: string, stats: Stats): {
+  count: number;
+  unit: "hours" | "lessons";
+  kind: "over" | "left" | "even";
+  tone: Tone;
+} {
+  const byHour = mode === "per_hour";
+  const used = byHour ? stats.hours : stats.lessonCount;
+  const added = byHour ? stats.hoursAdded : stats.lessonsAdded;
+  const over = Math.round((used - added) * 10) / 10;
+  const unit = byHour ? "hours" : "lessons";
+  if (over > 0) return { count: over, unit, kind: "over", tone: "empty" };
+  const left = Math.round((added - used) * 10) / 10;
+  if (left === 0) {
+    return used > 0
+      ? { count: 0, unit, kind: "left", tone: "empty" }
+      : { count: 0, unit, kind: "even", tone: "neutral" };
+  }
+  return { count: left, unit, kind: "left", tone: left <= 2 ? "low" : "ok" };
+}
+
 export function describePack(mode: string, stats: Stats, t: LooseT): { text: string; tone: Tone } {
   const byHour = mode === "per_hour";
   const used = byHour ? stats.hours : stats.lessonCount;

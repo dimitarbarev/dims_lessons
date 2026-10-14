@@ -1,5 +1,6 @@
 import { getLocale, getTranslations } from "next-intl/server";
 import { EmptyState } from "@/components/empty-state";
+import { PhoneLink } from "@/components/phone-link";
 import { StatusLine } from "@/components/pack-dot";
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/auth";
@@ -31,9 +32,9 @@ export default async function FamilyPage() {
         <p className="text-sm font-bold text-soft">{t("teacher")}</p>
         <p className="font-display text-3xl">{teacher?.name}</p>
         {phone ? (
-          <a className="btn btn-ink mt-4 inline-flex min-h-10 items-center rounded-full px-4 text-sm font-medium" href={`tel:${phone.replace(/\s/g, "")}`}>
-            {t("call")} · {phone}
-          </a>
+          <p className="mt-4 text-sm">
+            <PhoneLink phone={phone} />
+          </p>
         ) : (
           <p className="mt-2 text-sm text-soft">{t("noPhone")}</p>
         )}

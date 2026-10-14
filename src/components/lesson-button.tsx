@@ -23,6 +23,8 @@ export function LessonButton({
   placeLabel,
   materialsLabel,
   homeworkLabel,
+  materialsPlaceholder = "",
+  homeworkPlaceholder = "",
   optionalLabel,
   platforms,
   places,
@@ -42,6 +44,8 @@ export function LessonButton({
   placeLabel: string;
   materialsLabel: string;
   homeworkLabel: string;
+  materialsPlaceholder?: string;
+  homeworkPlaceholder?: string;
   optionalLabel: string;
   platforms: Choice[];
   places: Choice[];
@@ -146,14 +150,24 @@ export function LessonButton({
                         {materialsLabel}
                         <span className="ml-2 font-semibold text-soft">{optionalLabel}</span>
                       </span>
-                      <input className="field" value={materials} onChange={(event) => setMaterials(event.target.value)} />
+                      <input
+                        className="field"
+                        value={materials}
+                        placeholder={materialsPlaceholder}
+                        onChange={(event) => setMaterials(event.target.value)}
+                      />
                     </label>
                     <label className="block">
                       <span className="label">
                         {homeworkLabel}
                         <span className="ml-2 font-semibold text-soft">{optionalLabel}</span>
                       </span>
-                      <input className="field" value={homework} onChange={(event) => setHomework(event.target.value)} />
+                      <input
+                        className="field"
+                        value={homework}
+                        placeholder={homeworkPlaceholder}
+                        onChange={(event) => setHomework(event.target.value)}
+                      />
                     </label>
                   </div>
                   </div>

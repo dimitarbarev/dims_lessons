@@ -1,20 +1,19 @@
 import { getTranslations } from "next-intl/server";
 import { ErrorBanner } from "@/components/error-banner";
-import { Area, Field, primaryButton, SelectField } from "@/components/fields";
+import { primaryButton } from "@/components/fields";
 import { LanguageSwitch } from "@/components/language-switch";
 import { BrandLink } from "@/components/brand-link";
+import { RegisterForm } from "@/components/register-form";
 import { Link } from "@/i18n/navigation";
-import { submitRegistration } from "@/lib/actions";
 import { choiceOptions } from "@/lib/labels";
 
 export default async function RegisterPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; sent?: string }>;
+  searchParams: Promise<{ error?: string; sent?: string; code?: string; pays?: string }>;
 }) {
-  const { error, sent } = await searchParams;
+  const { error, sent, code, pays } = await searchParams;
   const t = await getTranslations("register");
-  const common = await getTranslations("common");
   const options = await choiceOptions();
 
   return (
@@ -37,36 +36,7 @@ export default async function RegisterPage({
           <h1 className="mt-2 font-display text-4xl">{t("title")}</h1>
           <p className="mt-2 text-soft">{t("lead")}</p>
           <ErrorBanner code={error} />
-          <form action={submitRegistration} className="mt-6 space-y-4 rounded-2xl bg-ivory p-5 shadow-card">
-            <Field label={t("parentName")} name="parentName" required />
-            <Field label={t("email")} name="email" type="email" required />
-            <Field label={t("phone")} name="phone" type="tel" optional={common("optional")} />
-            <Field label={t("social")} name="social" optional={common("optional")} />
-            <Field
-              label={t("occupation")}
-              name="occupation"
-              hint={t("occupationHint")}
-              optional={common("optional")}
-            />
-            <Field label={t("childName")} name="childName" required />
-            <SelectField
-              label={t("portrait")}
-              name="portrait"
-              defaultValue="girl"
-              options={[
-                { value: "girl", label: t("girl") },
-                { value: "boy", label: t("boy") },
-              ]}
-            />
-            <SelectField label={t("subject")} name="subject" defaultValue="math" options={options.subjects} />
-            <Field label={t("school")} name="school" optional={common("optional")} />
-            <Field label={t("grade")} name="grade" optional={common("optional")} />
-            <Area label={t("interests")} name="interests" optional={common("optional")} />
-            <Area label={t("ambitions")} name="ambitions" optional={common("optional")} />
-            <button className={primaryButton} type="submit">
-              {t("submit")}
-            </button>
-          </form>
+          <RegisterForm subjects={options.subjects} code={code ?? ""} pays={pays === "1"} />
         </>
       )}
     </div>

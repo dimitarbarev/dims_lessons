@@ -5,6 +5,9 @@ import { ClientBoard, type PanelId, type StatusTone, type WidgetModel } from "@/
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { ErrorBanner } from "@/components/error-banner";
 import { Area, butterButton, Field, primaryButton, SelectField } from "@/components/fields";
+import { LessonRecords } from "@/components/lesson-records";
+import { PhoneLink } from "@/components/phone-link";
+import { StudentFeedback, type FeedbackItem } from "@/components/student-feedback";
 import { StudentProfile } from "@/components/student-profile";
 import { Link } from "@/i18n/navigation";
 import {
@@ -14,7 +17,6 @@ import {
   linkParentByCode,
   logDetailedLesson,
   markSelfPayer,
-  removeLesson,
   removePayment,
   removeStudent,
   restoreStudent,
@@ -33,6 +35,7 @@ import {
   listPayments,
 } from "@/lib/db";
 import { formatCode, formatDay, formatMoney, todayISO } from "@/lib/format";
+import { packFigure } from "@/lib/stats";
 import { choiceOptions, labelOf } from "@/lib/labels";
 
 export default async function ClientPage({
@@ -40,7 +43,7 @@ export default async function ClientPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; saved?: string; edit?: string }>;
+  searchParams: Promise<{ error?: string; saved?: string; edit?: string; panel?: string }>;
 }) {
   const { id } = await params;
   const query = await searchParams;
@@ -69,17 +72,21 @@ export default async function ClientPage({
   ].join(" · ");
   const latestLesson = lessons[0];
   const latestPayment = payments[0];
-  const latestNote = notes[0];
-  const standing = standingWidget(client.stats, client.billing_mode, {
-    pack: t("widgetPack"),
+  const feedbackItems = feedbackFeed(requests, notes, locale, feedback);
+  const currentFeedback = feedbackItems.filter((item) => !item.archived);
+  const archivedFeedback = feedbackItems.filter((item) => item.archived);
+  const latestFeedback = currentFeedback.find((item) => !item.waiting) ?? currentFeedback[0];
+  const standing = standingWidget(client.billing_mode, client.stats, {
     balance: t("widgetBalance"),
-    left: t("leftWord"),
-    over: t("overWord"),
-    none: status("noneLeft"),
-    open: t("openShort"),
-    credit: t("creditShort"),
     settled: status("settled"),
-    money,
+    lessonOver: t("lessonOver"),
+    lessonsOver: t("lessonsOver"),
+    hourOver: t("hourOver"),
+    hoursOver: t("hoursOver"),
+    lessonLeft: t("lessonLeft"),
+    lessonsLeft: t("lessonsLeft"),
+    hourLeft: t("hourLeft"),
+    hoursLeft: t("hoursLeft"),
   });
   const profileBits = [labelOf(options.kinds, client.kind), client.school, client.grade].filter(Boolean).join(" · ");
   const portrait = client.portrait === "boy" ? "boy" : "girl";
@@ -105,9 +112,9 @@ export default async function ClientPage({
       label: t("widgetLesson"),
       figure: latestLesson ? formatDay(latestLesson.occurred_on, locale) : "—",
       caption: latestLesson
-        ? [labelOf(options.subjects, latestLesson.subject), latestLesson.materials || latestLesson.homework].filter(Boolean).join(" · ")
+        ? `${labelOf(options.subjects, latestLesson.subject)} · ${latestLesson.materials || t("materialsEmpty")}`
         : t("noLessons"),
-      detail: t("widgetWrite"),
+      detail: latestLesson ? latestLesson.homework || t("homeworkEmpty") : t("widgetWrite"),
       tone: "feature",
       size: "hero",
       display: "stat",
@@ -188,24 +195,14 @@ export default async function ClientPage({
       display: "stat",
     },
     {
-      id: "notes",
-      panel: "notes",
-      label: t("widgetNotes"),
-      figure: latestNote ? excerpt(latestNote.body) : t("noNotes"),
-      caption: latestNote ? `${latestNote.parent_name} · ${formatDay(latestNote.created_at, locale)}` : "",
-      tone: "plain",
-      size: "wide",
-      display: "story",
-    },
-    {
       id: "feedback",
       panel: "feedback",
       label: t("widgetFeedback"),
-      figure: String(requests.length),
-      caption: requests[0]?.open_question || (parents.length === 0 ? t("needParent") : t("noNotes")),
+      figure: latestFeedback ? excerpt(latestFeedback.title) : t("noNotes"),
+      caption: latestFeedback ? `${latestFeedback.who} · ${latestFeedback.date}` : parents.length === 0 ? t("needParent") : "",
       tone: "plain",
       size: "wide",
-      display: "stat",
+      display: "story",
     },
   ];
 
@@ -216,8 +213,7 @@ export default async function ClientPage({
     profile: t("profile"),
     pin: t("pin"),
     parents: t("parents"),
-    feedback: t("ask"),
-    notes: t("notes"),
+    feedback: t("widgetFeedback"),
   };
 
   const notice = (
@@ -242,7 +238,7 @@ export default async function ClientPage({
         widgets={widgets}
         titles={titles}
         closeLabel={t("close")}
-        initialPanel={query.edit === "profile" ? "profile" : panelForError(query.error)}
+        initialPanel={query.edit === "profile" ? "profile" : isPanel(query.panel) ? query.panel : panelForError(query.error)}
         notice={notice}
         panels={{
           lesson: (
@@ -257,8 +253,14 @@ export default async function ClientPage({
                     {latestLesson.platform ? ` · ${labelOf(options.platforms, latestLesson.platform)}` : ""}
                     {latestLesson.location ? ` · ${labelOf(options.locations, latestLesson.location)}` : ""}
                   </p>
-                  {latestLesson.materials ? <p className="mt-1 text-sm">{latestLesson.materials}</p> : null}
-                  {latestLesson.homework ? <p className="mt-1 text-sm font-semibold">{latestLesson.homework}</p> : null}
+                  <p className="mt-2 text-sm">
+                    <span className="text-soft">{t("materials")}. </span>
+                    {latestLesson.materials || t("materialsEmpty")}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold">
+                    <span className="font-normal text-soft">{t("homework")}. </span>
+                    {latestLesson.homework || t("homeworkEmpty")}
+                  </p>
                 </div>
               ) : (
                 <p className="text-soft">{t("noLessons")}</p>
@@ -272,8 +274,8 @@ export default async function ClientPage({
               <SelectField label={t("subject")} name="subject" defaultValue={client.subject_default} options={options.subjects} />
               <SelectField label={t("platform")} name="platform" defaultValue={client.platform_default} options={options.platforms} />
               <SelectField label={t("place")} name="location" defaultValue={client.location_default} options={options.locations} />
-              <Area label={t("materials")} name="materials" />
-              <Area label={t("homework")} name="homework" />
+              <Area label={t("materials")} name="materials" placeholder={t("materialsEmpty")} />
+              <Area label={t("homework")} name="homework" placeholder={t("homeworkEmpty")} />
               <div className="justify-self-start">
                 <button className={primaryButton} type="submit">
                   {t("log")}
@@ -327,32 +329,41 @@ export default async function ClientPage({
             </div>
           ),
           lessons: (
-            <div>
-              {lessons.length === 0 ? <p className="text-soft">{t("noLessons")}</p> : null}
-              <RecordList>
-                {lessons.map((lesson) => (
-                  <li key={lesson.id} className="rounded-3xl bg-paper px-4 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-bold">
-                          {formatDay(lesson.occurred_on, locale)} · {t("hours", { count: lesson.duration_hours || 1 })}
-                        </p>
-                        <p className="text-sm text-soft">
-                          {labelOf(options.subjects, lesson.subject)} · {labelOf(options.platforms, lesson.platform)} ·{" "}
-                          {labelOf(options.locations, lesson.location)}
-                        </p>
-                        {lesson.materials ? <p className="mt-1 text-sm">{lesson.materials}</p> : null}
-                        {lesson.homework ? <p className="mt-1 text-sm font-semibold">{lesson.homework}</p> : null}
-                      </div>
-                      <form action={removeLesson}>
-                        <input type="hidden" name="lessonId" value={lesson.id} />
-                        <ConfirmSubmit label={t("remove")} title={t("removeAsk")} message={t("removeConfirm")} cancel={t("cancel")} />
-                      </form>
-                    </div>
-                  </li>
-                ))}
-              </RecordList>
-            </div>
+            <LessonRecords
+              lessons={lessons.map((lesson) => ({
+                id: lesson.id,
+                occurredOn: lesson.occurred_on,
+                duration: String(lesson.duration_hours || 1),
+                subject: lesson.subject,
+                platform: lesson.platform || client.platform_default,
+                location: lesson.location || client.location_default,
+                materials: lesson.materials,
+                homework: lesson.homework,
+                title: `${formatDay(lesson.occurred_on, locale)} · ${t("hours", { count: lesson.duration_hours || 1 })}`,
+                meta: `${labelOf(options.subjects, lesson.subject)} · ${labelOf(options.platforms, lesson.platform)} · ${labelOf(options.locations, lesson.location)}`,
+              }))}
+              subjects={options.subjects}
+              platforms={options.platforms}
+              places={options.locations}
+              emptyLabel={t("noLessons")}
+              labels={{
+                edit: t("editLesson"),
+                save: t("saveLesson"),
+                cancel: t("cancel"),
+                remove: t("remove"),
+                removeAsk: t("removeAsk"),
+                removeConfirm: t("removeConfirm"),
+                date: t("date"),
+                duration: t("duration"),
+                subject: t("subject"),
+                platform: t("platform"),
+                place: t("place"),
+                materials: t("materials"),
+                homework: t("homework"),
+                materialsPlaceholder: t("materialsEmpty"),
+                homeworkPlaceholder: t("homeworkEmpty"),
+              }}
+            />
           ),
           profile: (
             <StudentProfile
@@ -452,10 +463,18 @@ export default async function ClientPage({
           parents: (
             <div className="space-y-6">
               {parents.some((parent) => parent.public_code && parent.public_code === client.public_code) ? (
-                <p className="rounded-3xl bg-peach px-4 py-3">
-                  <span className="font-bold">{t("paysSelf")}</span>
-                  <span className="mt-1 block text-sm tracking-[0.2em] text-soft">{formatCode(client.public_code)}</span>
-                </p>
+                <div className="rounded-3xl bg-peach px-4 py-3">
+                  <p className="font-bold">{t("paysSelf")}</p>
+                  <p className="mt-1 text-sm tracking-[0.2em] text-soft">{formatCode(client.public_code)}</p>
+                  {parents
+                    .filter((parent) => parent.public_code === client.public_code)
+                    .map((parent) => (
+                      <div key={parent.id} className="mt-2 text-sm">
+                        {parent.phone ? <PhoneLink phone={parent.phone} /> : null}
+                        {parent.email.endsWith("@lessons.local") ? null : <p className="text-soft">{parent.email}</p>}
+                      </div>
+                    ))}
+                </div>
               ) : (
                 <form action={markSelfPayer}>
                   <input type="hidden" name="clientId" value={client.id} />
@@ -476,89 +495,89 @@ export default async function ClientPage({
                       <p className="font-bold">{parent.name}</p>
                       <p className="text-sm tracking-[0.16em] text-soft">{formatCode(parent.public_code)}</p>
                       {parent.email.endsWith("@lessons.local") ? null : <p className="text-sm text-soft">{parent.email}</p>}
-                      {parent.phone ? <p className="text-sm">{parent.phone}</p> : null}
+                      {parent.phone ? (
+                        <p className="text-sm">
+                          <PhoneLink phone={parent.phone} />
+                        </p>
+                      ) : null}
                       {parent.occupation ? <p className="text-sm">{parent.occupation}</p> : null}
                       {parent.social ? <p className="text-sm">{parent.social}</p> : null}
                     </li>
                   ))}
               </RecordList>
-              <form action={linkParentByCode} className="grid gap-4">
-                <input type="hidden" name="clientId" value={client.id} />
-                <Field label={t("linkCode")} name="code" hint={t("linkCodeHint")} inputMode="numeric" />
-                <div className="justify-self-start">
-                  <button className={butterButton} type="submit">
-                    {t("link")}
-                  </button>
-                </div>
-              </form>
-              <div>
-                <h3 className="mb-3 font-display text-2xl">{t("addParent")}</h3>
-                <form action={linkParentAction} className="grid gap-4 sm:grid-cols-2">
+              <section className="rounded-[28px] border border-ink/10 bg-blush/50 p-4">
+                <h3 className="font-display text-2xl">{t("linkAnother")}</h3>
+                <p className="mt-1 mb-4 text-sm text-soft">{t("linkAnotherLead")}</p>
+                <form action={linkParentByCode} className="grid gap-4">
                   <input type="hidden" name="clientId" value={client.id} />
-                  <Field label={t("parentName")} name="parentName" />
-                  <Field label={t("parentEmail")} name="parentEmail" type="email" />
-                  <Field label={t("parentPhone")} name="parentPhone" type="tel" />
-                  <Field label={t("parentSocial")} name="parentSocial" />
-                  <Field label={t("parentOccupation")} name="parentOccupation" />
-                  <div className="justify-self-start sm:col-span-2">
+                  <Field label={t("linkCode")} name="code" hint={t("linkCodeHint")} inputMode="numeric" />
+                  <div className="justify-self-start">
                     <button className={butterButton} type="submit">
                       {t("link")}
                     </button>
                   </div>
                 </form>
-              </div>
+                <div className="mt-6 border-t border-ink/10 pt-5">
+                  <h3 className="mb-3 font-display text-2xl">{t("addParent")}</h3>
+                  <form action={linkParentAction} className="grid gap-4 sm:grid-cols-2">
+                    <input type="hidden" name="clientId" value={client.id} />
+                    <Field label={t("parentName")} name="parentName" />
+                    <Field label={t("parentEmail")} name="parentEmail" type="email" />
+                    <Field label={t("parentPhone")} name="parentPhone" type="tel" />
+                    <Field label={t("parentSocial")} name="parentSocial" />
+                    <Field label={t("parentOccupation")} name="parentOccupation" />
+                    <div className="justify-self-start sm:col-span-2">
+                      <button className={butterButton} type="submit">
+                        {t("link")}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </section>
             </div>
           ),
           feedback: (
-            <div>
-              {parents.length === 0 ? (
-                <p className="text-soft">{t("needParent")}</p>
-              ) : (
-                <form action={sendFeedbackRequest} className="grid gap-4">
-                  <input type="hidden" name="clientId" value={client.id} />
-                  <SelectField
-                    label={feedback("parentLabel")}
-                    name="parentId"
-                    defaultValue={parents[0]?.id}
-                    options={parents.map((parent) => ({ value: parent.id, label: parent.name }))}
-                  />
-                  <Area label={t("question")} name="question" defaultValue={feedback("defaultQuestion")} />
-                  <div className="justify-self-start">
-                    <button className={primaryButton} type="submit">
-                      {t("sendRequest")}
-                    </button>
-                  </div>
-                </form>
-              )}
-              {requests.length > 0 ? (
-                <RecordList className="mt-4">
-                  {requests.map((request) => (
-                    <li key={request.id} className="rounded-3xl bg-paper px-4 py-3 text-sm">
-                      <p className="font-bold">
-                        {request.parent_name} · {request.status === "answered" ? feedback("answered") : feedback("waiting")}
-                      </p>
-                      <p className="mt-1">{request.open_question}</p>
-                      {request.open_answer ? <p className="mt-1">{request.open_answer}</p> : null}
-                    </li>
-                  ))}
-                </RecordList>
-              ) : null}
-            </div>
-          ),
-          notes: (
-            <div>
-              {notes.length === 0 ? <p className="text-soft">{t("noNotes")}</p> : null}
-              <RecordList>
-                {notes.map((note) => (
-                  <li key={note.id} className="rounded-3xl bg-paper px-4 py-3">
-                    <p className="text-sm font-bold text-soft">
-                      {note.parent_name} · {formatDay(note.created_at, locale)}
-                    </p>
-                    <p className="mt-1">{note.body}</p>
-                  </li>
-                ))}
-              </RecordList>
-            </div>
+            <StudentFeedback
+              items={currentFeedback}
+              archived={archivedFeedback}
+              back={`/clients/${client.id}`}
+              labels={{
+                request: t("requestFeedback"),
+                archive: t("feedbackArchive"),
+                latest: t("feedbackLatest"),
+                empty: t("noNotes"),
+                archiveEmpty: t("feedbackArchiveEmpty"),
+                waiting: feedback("waiting"),
+                archiveAction: feedback("archiveAction"),
+                restore: feedback("restore"),
+                archiveAsk: feedback("archiveAsk"),
+                archiveLead: feedback("archiveLead"),
+                restoreAsk: feedback("restoreAsk"),
+                restoreLead: feedback("restoreLead"),
+                cancel: feedback("cancel"),
+              }}
+              request={
+                parents.length === 0 ? (
+                  <p className="text-soft">{t("needParent")}</p>
+                ) : (
+                  <form action={sendFeedbackRequest} className="grid gap-4 rounded-[28px] bg-paper p-4">
+                    <input type="hidden" name="clientId" value={client.id} />
+                    <SelectField
+                      label={feedback("parentLabel")}
+                      name="parentId"
+                      defaultValue={parents[0]?.id}
+                      options={parents.map((parent) => ({ value: parent.id, label: parent.name }))}
+                    />
+                    <Area label={t("question")} name="question" defaultValue={feedback("defaultQuestion")} />
+                    <div className="justify-self-start">
+                      <button className={primaryButton} type="submit">
+                        {t("sendRequest")}
+                      </button>
+                    </div>
+                  </form>
+                )
+              }
+            />
           ),
         }}
       />
@@ -584,44 +603,90 @@ function panelForError(error?: string): PanelId | null {
 }
 
 function standingWidget(
-  stats: { remaining: number | null; owedCents: number },
   billingMode: string,
+  stats: Parameters<typeof packFigure>[1],
   copy: {
-    pack: string;
     balance: string;
-    left: string;
-    over: string;
-    none: string;
-    open: string;
-    credit: string;
     settled: string;
-    money: (cents: number) => string;
+    lessonOver: string;
+    lessonsOver: string;
+    hourOver: string;
+    hoursOver: string;
+    lessonLeft: string;
+    lessonsLeft: string;
+    hourLeft: string;
+    hoursLeft: string;
   },
 ): { label: string; figure: string; caption: string; status: StatusTone } {
-  if (stats.remaining !== null) {
-    if (stats.remaining < 0) {
-      return { label: copy.pack, figure: String(Math.abs(stats.remaining)), caption: copy.over, status: "empty" };
-    }
-    if (stats.remaining === 0) {
-      return { label: copy.pack, figure: "0", caption: copy.none, status: "empty" };
-    }
-    return {
-      label: copy.pack,
-      figure: String(stats.remaining),
-      caption: copy.left,
-      status: stats.remaining <= 2 ? "low" : "ok",
-    };
-  }
-  if (stats.owedCents > 0) {
-    return { label: copy.balance, figure: copy.money(stats.owedCents), caption: copy.open, status: "due" };
-  }
-  if (stats.owedCents < 0) {
-    return { label: copy.balance, figure: copy.money(-stats.owedCents), caption: copy.credit, status: "ok" };
-  }
-  return {
-    label: billingMode === "prepaid" ? copy.pack : copy.balance,
-    figure: copy.money(0),
-    caption: copy.settled,
-    status: "neutral",
-  };
+  const pack = packFigure(billingMode, stats);
+  const one = pack.count === 1;
+  const caption =
+    pack.kind === "over"
+      ? pack.unit === "hours"
+        ? one
+          ? copy.hourOver
+          : copy.hoursOver
+        : one
+          ? copy.lessonOver
+          : copy.lessonsOver
+      : pack.kind === "left"
+        ? pack.unit === "hours"
+          ? one
+            ? copy.hourLeft
+            : copy.hoursLeft
+          : one
+            ? copy.lessonLeft
+            : copy.lessonsLeft
+        : copy.settled;
+  return { label: copy.balance, figure: String(pack.count), caption, status: pack.tone };
+}
+
+const panels = ["lesson", "payments", "lessons", "profile", "pin", "parents", "feedback"] as const;
+
+function isPanel(value?: string): value is PanelId {
+  return panels.some((panel) => panel === value);
+}
+
+function feedbackFeed(
+  requests: ReturnType<typeof listFeedbackRequests>,
+  notes: ReturnType<typeof listNotesForClient>,
+  locale: string,
+  feedback: (key: "pace" | "following" | "homework" | "overall", values?: Record<string, string | number>) => string,
+): (FeedbackItem & { archived: boolean; sort: string })[] {
+  const fromRequests = requests.map((request) => ({
+    id: request.id,
+    kind: "request" as const,
+    who: request.parent_name ?? "",
+    date: formatDay(request.answered_at || request.created_at, locale),
+    sort: request.answered_at || request.created_at,
+    title: request.open_question,
+    body: request.open_answer,
+    waiting: request.status !== "answered",
+    archived: request.archived === 1,
+    scores:
+      request.status === "answered"
+        ? [
+            { label: feedback("pace"), value: request.pace ?? 3 },
+            { label: feedback("following"), value: request.following_score ?? 3 },
+            { label: feedback("homework"), value: request.homework_score ?? 3 },
+            { label: feedback("overall"), value: request.overall ?? 3 },
+          ]
+        : [],
+  }));
+  const fromNotes = notes.map((note) => ({
+    id: note.id,
+    kind: "note" as const,
+    who: note.parent_name,
+    date: formatDay(note.created_at, locale),
+    sort: note.created_at,
+    title: note.body,
+    body: "",
+    waiting: false,
+    archived: note.archived === 1,
+    scores: [],
+  }));
+  return [...fromRequests, ...fromNotes].sort((a, b) => {
+    if (a.waiting !== b.waiting) return a.waiting ? 1 : -1;
+    return b.sort.localeCompare(a.sort);
+  });
 }

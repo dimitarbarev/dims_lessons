@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
-export type PanelId = "lesson" | "payments" | "lessons" | "profile" | "pin" | "parents" | "feedback" | "notes";
+export type PanelId = "lesson" | "payments" | "lessons" | "profile" | "pin" | "parents" | "feedback";
 
 export type WidgetSize = "hero" | "wide" | "tile";
 export type WidgetTone = "feature" | "blush" | "plain";

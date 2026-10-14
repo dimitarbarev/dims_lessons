@@ -47,12 +47,14 @@ export function Area({
   defaultValue,
   hint,
   optional,
+  placeholder,
 }: {
   label: string;
   name: string;
   defaultValue?: string;
   hint?: string;
   optional?: string;
+  placeholder?: string;
 }) {
   return (
     <label className="block">
@@ -61,7 +63,7 @@ export function Area({
         {optional ? <span className="ml-2 font-semibold text-soft">{optional}</span> : null}
       </span>
       {hint ? <span className="mb-1.5 block text-xs text-soft">{hint}</span> : null}
-      <textarea className="field min-h-28" name={name} defaultValue={defaultValue} />
+      <textarea className="field min-h-28" name={name} defaultValue={defaultValue} placeholder={placeholder} />
     </label>
   );
 }

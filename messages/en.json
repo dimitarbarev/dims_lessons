@@ -5,7 +5,7 @@
   },
   "nav": {
     "today": "Students",
-    "money": "Money",
+    "money": "Financial",
     "signups": "Signups",
     "feedback": "Feedback",
     "settings": "Settings",
@@ -53,8 +53,15 @@
   },
   "register": {
     "kicker": "02  Registration",
-    "title": "Tell Dimi about your child",
-    "lead": "Nothing here is published. Dimi confirms it before you can sign in.",
+    "title": "Who will study",
+    "lead": "Fill this in for the student. If they pay for themselves, say so. Otherwise add the first parent.",
+    "studentHeading": "The person who will study",
+    "paysSelf": "This person pays for themselves",
+    "paysSelfLead": "Turn this on when they handle their own lessons. A second parent can be linked later.",
+    "parentHeading": "First parent",
+    "parentLead": "The person who pays. A second parent can be linked to the same student afterwards.",
+    "teacherCode": "Teacher code",
+    "teacherCodeHint": "Six digits from your teacher. An invitation link fills this in.",
     "parentName": "Your name",
     "email": "Email",
     "phone": "Phone",
@@ -135,12 +142,14 @@
     "emptyArchiveLead": "Students you are no longer teaching will wait here."
   },
   "money": {
-    "kicker": "04  Money",
-    "title": "Who to follow up",
+    "kicker": "04  Financial",
+    "title": "Who to reach",
     "emptyTitle": "Everyone is up to date",
-    "emptyLead": "No open balances, and no pack is down to its last lessons.",
-    "owedHeading": "Open balances",
-    "packHeading": "Packs running low"
+    "emptyLead": "No student is running low on lessons or hours.",
+    "reach": "Who pays",
+    "payer": "Parent",
+    "noPayer": "No one is linked yet. Open the student and link the person who pays.",
+    "noContact": "No phone or email on this profile."
   },
   "client": {
     "newKicker": "05  New client",
@@ -216,6 +225,24 @@
     "needParent": "Link a parent before you can ask for feedback.",
     "notes": "Notes from the family",
     "noNotes": "No feedback yet.",
+    "lessonOver": "lesson over the pack",
+    "lessonsOver": "lessons over the pack",
+    "hourOver": "hour over the pack",
+    "hoursOver": "hours over the pack",
+    "lessonLeft": "lesson left",
+    "lessonsLeft": "lessons left",
+    "hourLeft": "hour left",
+    "hoursLeft": "hours left",
+    "materialsEmpty": "What you covered in the lesson",
+    "homeworkEmpty": "Homework to take home",
+    "editLesson": "Edit",
+    "saveLesson": "Save lesson",
+    "linkAnother": "Link another parent",
+    "linkAnotherLead": "This sits apart from the people already linked to this student.",
+    "requestFeedback": "Request feedback",
+    "feedbackArchive": "Previous feedback",
+    "feedbackLatest": "Most recent",
+    "feedbackArchiveEmpty": "Nothing is archived.",
     "setPrice": "Add a price per lesson so an open balance can be calculated.",
     "close": "Close",
     "widgetLesson": "Last lesson",
@@ -246,6 +273,9 @@
     "title": "Waiting for you",
     "emptyTitle": "No pending registrations",
     "emptyLead": "When a parent fills in the form, it will land here.",
+    "invite": "Copy invitation link",
+    "inviteCopied": "Link copied",
+    "inviteLead": "Share the link, or the code beside it in Settings. The link fills the code into the form.",
     "accept": "Accept",
     "decline": "Decline",
     "declineAsk": "Decline this signup?",
@@ -304,6 +334,9 @@
     "save": "Save",
     "saved": "Saved.",
     "code": "Your code",
+    "invite": "Copy invitation link",
+    "inviteCopied": "Link copied",
+    "inviteLead": "People can type this code, or open the link, which fills it in.",
     "edit": "Edit",
     "cancel": "Cancel"
   },
@@ -343,6 +376,8 @@
     "unknownCode": "That code does not match a profile."
   },
   "common": {
-    "optional": "Optional"
+    "optional": "Optional",
+    "copy": "Copy",
+    "copied": "Copied"
   }
 }

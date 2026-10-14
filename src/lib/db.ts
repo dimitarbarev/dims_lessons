@@ -91,6 +91,7 @@ export type Registration = {
   ambitions: string;
   subject: string;
   portrait: string;
+  pays_self: number;
   status: string;
   created_at: string;
 };
@@ -431,6 +432,7 @@ function ensureStudio() {
   ensureColumn("clients", "student_email", "TEXT");
   ensureColumn("clients", "password_hash", "TEXT");
   ensureColumn("clients", "password_salt", "TEXT");
+  ensureColumn("registrations", "pays_self", "INTEGER NOT NULL DEFAULT 0");
   globalForDb.lessonsDb?.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS clients_student_email ON clients(student_email) WHERE student_email IS NOT NULL AND student_email != '';
     CREATE UNIQUE INDEX IF NOT EXISTS teachers_public_code ON teachers(public_code) WHERE public_code IS NOT NULL AND public_code != '';
@@ -620,6 +622,7 @@ function ensureStudio() {
       ambitions: "",
       subject: "math",
       portrait: "girl",
+      pays_self: 0,
     });
   }
 
@@ -1021,6 +1024,33 @@ export function deleteLesson(id: string) {
   run("DELETE FROM lessons WHERE id = ?", id);
 }
 
+export function updateLesson(
+  id: string,
+  input: {
+    occurredOn: string;
+    subject: string;
+    platform: string;
+    location: string;
+    materials: string;
+    homework: string;
+    durationHours: number;
+  },
+) {
+  run(
+    `UPDATE lessons
+     SET occurred_on = ?, subject = ?, platform = ?, location = ?, materials = ?, homework = ?, duration_hours = ?
+     WHERE id = ?`,
+    input.occurredOn,
+    input.subject,
+    input.platform,
+    input.location,
+    input.materials,
+    input.homework,
+    input.durationHours,
+    id,
+  );
+}
+
 export function insertPayment(input: {
   clientId: string;
   paidOn: string;
@@ -1061,8 +1091,8 @@ export function insertRegistration(input: Omit<Registration, "id" | "status" | "
   run(
     `INSERT INTO registrations (
       id, parent_name, parent_email, parent_phone, parent_social, parent_occupation,
-      child_name, school, grade, interests, ambitions, subject, portrait, status, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+      child_name, school, grade, interests, ambitions, subject, portrait, pays_self, status, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
     id,
     input.parent_name,
     input.parent_email,
@@ -1076,6 +1106,7 @@ export function insertRegistration(input: Omit<Registration, "id" | "status" | "
     input.ambitions,
     input.subject,
     input.portrait === "boy" ? "boy" : "girl",
+    input.pays_self ? 1 : 0,
     nowIso(),
   );
   return id;
