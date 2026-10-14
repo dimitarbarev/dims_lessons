@@ -17,6 +17,7 @@ export function summarize(
   lessonCount: number,
   paidCents: number,
   lessonsAdded: number,
+  hours = lessonCount,
 ): Stats {
   if (mode === "prepaid") {
     const remaining = lessonsAdded - lessonCount;
@@ -31,12 +32,13 @@ export function summarize(
     };
   }
 
+  const units = mode === "per_hour" ? hours : lessonCount;
   return {
     lessonCount,
     paidCents,
     lessonsAdded,
     remaining: null,
-    owedCents: lessonCount * priceCents - paidCents,
+    owedCents: Math.round(units * priceCents) - paidCents,
     level: "na",
   };
 }

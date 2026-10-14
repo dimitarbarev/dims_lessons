@@ -4,6 +4,8 @@ import { NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { routing, type Locale } from "@/i18n/routing";
+import { BroomFlight } from "@/components/broom-flight";
+import { ForestPassage } from "@/components/forest-passage";
 import "../globals.css";
 
 const nunito = Nunito({ subsets: ["latin", "cyrillic"], variable: "--font-nunito" });
@@ -41,7 +43,11 @@ export default async function LocaleLayout({
   return (
     <html lang={locale} className={`${nunito.variable} ${jakarta.variable} ${garamond.variable}`}>
       <body className="font-sans antialiased">
-        <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
+        <NextIntlClientProvider messages={messages}>
+          {children}
+          <ForestPassage />
+          <BroomFlight />
+        </NextIntlClientProvider>
       </body>
     </html>
   );

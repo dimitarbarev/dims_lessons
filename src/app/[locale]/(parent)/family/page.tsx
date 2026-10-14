@@ -3,8 +3,8 @@ import { EmptyState } from "@/components/empty-state";
 import { StatusLine } from "@/components/pack-dot";
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/auth";
-import { getTeacher, listClientsOfParent } from "@/lib/db";
-import { formatMoney } from "@/lib/format";
+import { getParentById, getTeacher, listClientsOfParent } from "@/lib/db";
+import { formatCode, formatMoney } from "@/lib/format";
 import { choiceOptions, labelOf } from "@/lib/labels";
 import { describeStats } from "@/lib/stats";
 
@@ -15,6 +15,7 @@ export default async function FamilyPage() {
   const t = await getTranslations("parent");
   const status = await getTranslations("status");
   const options = await choiceOptions();
+  const parent = getParentById(session.user_id);
   const children = listClientsOfParent(session.user_id);
   const money = (cents: number) => formatMoney(cents, teacher?.currency ?? "EUR", locale);
   const phone = teacher?.phone?.trim() ?? "";
@@ -24,6 +25,7 @@ export default async function FamilyPage() {
       <p className="kicker">{t("kicker")}</p>
       <h1 className="mt-2 font-display text-4xl sm:text-5xl">{t("title")}</h1>
       <p className="mt-2 text-soft">{t("readOnly")}</p>
+      {parent?.public_code ? <p className="mt-3 text-sm tracking-[0.28em] text-soft">{t("code")} {formatCode(parent.public_code)}</p> : null}
 
       <section className="mt-5 rounded-2xl bg-ivory p-5 shadow-card">
         <p className="text-sm font-bold text-soft">{t("teacher")}</p>

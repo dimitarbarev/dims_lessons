@@ -15,6 +15,7 @@ export default async function TodayPage() {
   const teacher = getTeacherById(session.user_id)!;
   const locale = await getLocale();
   const t = await getTranslations("today");
+  const clientCopy = await getTranslations("client");
   const status = await getTranslations("status");
   const options = await choiceOptions();
   const clients = listClients(teacher.id).sort((a, b) => {
@@ -53,7 +54,17 @@ export default async function TodayPage() {
                   </p>
                   <StatusLine text={described.text} tone={described.tone} />
                 </Link>
-                <LessonButton clientId={client.id} label={t("lesson")} savedLabel={t("saved")} />
+                <LessonButton
+                  clientId={client.id}
+                  label={t("lesson")}
+                  savedLabel={t("saved")}
+                  title={t("lengthTitle")}
+                  lead={t("lengthLead")}
+                  otherLabel={t("otherLength")}
+                  hoursLabel={t("hoursLabel")}
+                  saveLabel={t("lesson")}
+                  closeLabel={clientCopy("close")}
+                />
               </li>
             );
           })}

@@ -15,6 +15,7 @@ export type Teacher = {
   phone: string;
   currency: string;
   locale: string;
+  public_code: string;
 };
 
 export type Parent = {
@@ -25,6 +26,7 @@ export type Parent = {
   social: string;
   occupation: string;
   locale: string;
+  public_code: string;
 };
 
 export type Client = {
@@ -43,6 +45,7 @@ export type Client = {
   ambitions: string;
   status: string;
   student_email: string | null;
+  public_code: string;
   student_pin_hash: string | null;
   student_pin_salt: string | null;
   created_at: string;
@@ -59,6 +62,7 @@ export type Lesson = {
   location: string;
   materials: string;
   homework: string;
+  duration_hours: number;
   created_at: string;
 };
 
@@ -84,6 +88,7 @@ export type Registration = {
   interests: string;
   ambitions: string;
   subject: string;
+  portrait: string;
   status: string;
   created_at: string;
 };
@@ -94,6 +99,7 @@ export type FeedbackNote = {
   client_id: string | null;
   body: string;
   created_at: string;
+  archived: number;
   parent_name: string;
   client_name: string | null;
 };
@@ -112,6 +118,7 @@ export type FeedbackRequest = {
   open_answer: string;
   created_at: string;
   answered_at: string | null;
+  archived: number;
   parent_name?: string;
   client_name?: string | null;
 };
@@ -327,6 +334,57 @@ function clientByName(teacherId: string, name: string) {
   );
 }
 
+function codeTaken(code: string) {
+  return Boolean(
+    one("SELECT 1 AS ok FROM teachers WHERE public_code = ?", code) ||
+      one("SELECT 1 AS ok FROM parents WHERE public_code = ?", code) ||
+      one("SELECT 1 AS ok FROM clients WHERE public_code = ?", code),
+  );
+}
+
+function mintCode() {
+  let code = "";
+  do {
+    code = String(Math.floor(Math.random() * 1000000)).padStart(6, "0");
+  } while (code === "000000" || codeTaken(code));
+  return code;
+}
+
+function fillPublicCodes() {
+  for (const table of ["teachers", "parents", "clients"] as const) {
+    const rows = many<{ id: string; public_code: string | null }>(`SELECT id, public_code FROM ${table}`);
+    for (const row of rows) {
+      if (row.public_code) continue;
+      run(`UPDATE ${table} SET public_code = ? WHERE id = ?`, mintCode(), row.id);
+    }
+  }
+}
+
+export function getParentByCode(code: string) {
+  return one<Parent>(
+    "SELECT id, name, email, phone, social, occupation, locale, public_code FROM parents WHERE public_code = ?",
+    code,
+  );
+}
+
+export function markPaysForSelf(clientId: string) {
+  const client = one<Client>("SELECT * FROM clients WHERE id = ?", clientId);
+  if (!client?.public_code) return;
+  let parent = getParentByCode(client.public_code);
+  if (!parent) {
+    const email = `self.${client.public_code}@lessons.local`;
+    parent = upsertParent({
+      name: client.name,
+      email,
+      phone: "",
+      social: "",
+      occupation: "",
+      publicCode: client.public_code,
+    });
+  }
+  linkParent(client.id, parent.id);
+}
+
 function ensureColumn(table: string, column: string, type: string) {
   const db = globalForDb.lessonsDb;
   if (!db) return;
@@ -355,6 +413,13 @@ function fillLessons(
 }
 
 function ensureStudio() {
+  ensureColumn("teachers", "public_code", "TEXT");
+  ensureColumn("parents", "public_code", "TEXT");
+  ensureColumn("clients", "public_code", "TEXT");
+  ensureColumn("lessons", "duration_hours", "REAL NOT NULL DEFAULT 1");
+  ensureColumn("registrations", "portrait", "TEXT NOT NULL DEFAULT 'girl'");
+  ensureColumn("feedback_notes", "archived", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn("feedback_requests", "archived", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn("teachers", "password_hash", "TEXT");
   ensureColumn("teachers", "password_salt", "TEXT");
   ensureColumn("parents", "password_hash", "TEXT");
@@ -362,9 +427,13 @@ function ensureStudio() {
   ensureColumn("clients", "student_email", "TEXT");
   ensureColumn("clients", "password_hash", "TEXT");
   ensureColumn("clients", "password_salt", "TEXT");
-  globalForDb.lessonsDb?.exec(
-    "CREATE UNIQUE INDEX IF NOT EXISTS clients_student_email ON clients(student_email) WHERE student_email IS NOT NULL AND student_email != ''",
-  );
+  globalForDb.lessonsDb?.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS clients_student_email ON clients(student_email) WHERE student_email IS NOT NULL AND student_email != '';
+    CREATE UNIQUE INDEX IF NOT EXISTS teachers_public_code ON teachers(public_code) WHERE public_code IS NOT NULL AND public_code != '';
+    CREATE UNIQUE INDEX IF NOT EXISTS parents_public_code ON parents(public_code) WHERE public_code IS NOT NULL AND public_code != '';
+    CREATE UNIQUE INDEX IF NOT EXISTS clients_public_code ON clients(public_code) WHERE public_code IS NOT NULL AND public_code != '';
+  `);
+  fillPublicCodes();
 
   const teacherAccount = demoAccount("teacher");
   const teacher = getTeacherByEmail(teacherAccount.email) ?? getTeacher();
@@ -546,8 +615,11 @@ function ensureStudio() {
       interests: "Puzzles",
       ambitions: "",
       subject: "math",
+      portrait: "girl",
     });
   }
+
+  if (elena) markPaysForSelf(elena.id);
 }
 
 type PasswordRow = { id: string; password_hash: string | null; password_salt: string | null };
@@ -617,21 +689,22 @@ function withStats(client: Client): ClientCard {
       lessons?.n ?? 0,
       payments?.amount ?? 0,
       payments?.added ?? 0,
+      one<{ n: number }>("SELECT COALESCE(SUM(duration_hours), 0) AS n FROM lessons WHERE client_id = ?", client.id)?.n ?? 0,
     ),
   };
 }
 
 export function getTeacher() {
-  return one<Teacher>("SELECT id, name, email, phone, currency, locale FROM teachers LIMIT 1");
+  return one<Teacher>("SELECT id, name, email, phone, currency, locale, public_code FROM teachers LIMIT 1");
 }
 
 export function getTeacherById(id: string) {
-  return one<Teacher>("SELECT id, name, email, phone, currency, locale FROM teachers WHERE id = ?", id);
+  return one<Teacher>("SELECT id, name, email, phone, currency, locale, public_code FROM teachers WHERE id = ?", id);
 }
 
 export function getTeacherByEmail(email: string) {
   return one<Teacher>(
-    "SELECT id, name, email, phone, currency, locale FROM teachers WHERE email = ?",
+    "SELECT id, name, email, phone, currency, locale, public_code FROM teachers WHERE email = ?",
     email,
   );
 }
@@ -653,14 +726,14 @@ export function updateTeacherLocale(id: string, locale: string) {
 
 export function getParentById(id: string) {
   return one<Parent>(
-    "SELECT id, name, email, phone, social, occupation, locale FROM parents WHERE id = ?",
+    "SELECT id, name, email, phone, social, occupation, locale, public_code FROM parents WHERE id = ?",
     id,
   );
 }
 
 export function getParentByEmail(email: string) {
   return one<Parent>(
-    "SELECT id, name, email, phone, social, occupation, locale FROM parents WHERE email = ?",
+    "SELECT id, name, email, phone, social, occupation, locale, public_code FROM parents WHERE email = ?",
     email,
   );
 }
@@ -687,6 +760,7 @@ export function upsertParent(input: {
   phone: string;
   social: string;
   occupation: string;
+  publicCode?: string;
 }) {
   const existing = getParentByEmail(input.email);
   if (existing) {
@@ -712,14 +786,15 @@ export function upsertParent(input: {
 
   const id = cryptoId();
   run(
-    `INSERT INTO parents (id, name, email, phone, social, occupation, locale, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, 'en', ?)`,
+    `INSERT INTO parents (id, name, email, phone, social, occupation, locale, public_code, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'en', ?, ?)`,
     id,
     input.name || input.email,
     input.email,
     input.phone,
     input.social,
     input.occupation,
+    input.publicCode || mintCode(),
     nowIso(),
   );
   return getParentById(id)!;
@@ -769,8 +844,8 @@ export function insertClient(input: {
   run(
     `INSERT INTO clients (
       id, teacher_id, name, kind, subject_default, platform_default, location_default,
-      price_cents, billing_mode, school, grade, interests, ambitions, status, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
+      price_cents, billing_mode, school, grade, interests, ambitions, status, public_code, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
     id,
     input.teacherId,
     input.name,
@@ -784,6 +859,7 @@ export function insertClient(input: {
     input.grade,
     input.interests,
     input.ambitions,
+    mintCode(),
     nowIso(),
   );
   return id;
@@ -855,7 +931,7 @@ export function matchStudent(name: string, pin: string) {
 
 export function listParentsOfClient(clientId: string) {
   return many<Parent>(
-    `SELECT p.id, p.name, p.email, p.phone, p.social, p.occupation, p.locale
+    `SELECT p.id, p.name, p.email, p.phone, p.social, p.occupation, p.locale, p.public_code
      FROM parents p
      JOIN client_parents cp ON cp.parent_id = p.id
      WHERE cp.client_id = ?
@@ -882,10 +958,13 @@ export function insertLesson(input: {
   location: string;
   materials: string;
   homework: string;
+  durationHours?: number;
 }) {
+  const hours = input.durationHours && input.durationHours > 0 ? input.durationHours : 1;
   run(
-    `INSERT INTO lessons (id, client_id, occurred_on, subject, platform, location, materials, homework, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO lessons (
+      id, client_id, occurred_on, subject, platform, location, materials, homework, duration_hours, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     cryptoId(),
     input.clientId,
     input.occurredOn,
@@ -894,6 +973,7 @@ export function insertLesson(input: {
     input.location,
     input.materials,
     input.homework,
+    hours,
     nowIso(),
   );
 }
@@ -951,8 +1031,8 @@ export function insertRegistration(input: Omit<Registration, "id" | "status" | "
   run(
     `INSERT INTO registrations (
       id, parent_name, parent_email, parent_phone, parent_social, parent_occupation,
-      child_name, school, grade, interests, ambitions, subject, status, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+      child_name, school, grade, interests, ambitions, subject, portrait, status, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
     id,
     input.parent_name,
     input.parent_email,
@@ -965,6 +1045,7 @@ export function insertRegistration(input: Omit<Registration, "id" | "status" | "
     input.interests,
     input.ambitions,
     input.subject,
+    input.portrait === "boy" ? "boy" : "girl",
     nowIso(),
   );
   return id;
@@ -1000,7 +1081,7 @@ export function insertFeedbackNote(parentId: string, clientId: string | null, bo
 }
 
 const noteSelect = `
-  SELECT n.id, n.parent_id, n.client_id, n.body, n.created_at,
+  SELECT n.id, n.parent_id, n.client_id, n.body, n.created_at, n.archived,
          p.name AS parent_name, c.name AS client_name
   FROM feedback_notes n
   JOIN parents p ON p.id = n.parent_id
@@ -1083,8 +1164,13 @@ export function answerFeedbackRequest(
   );
 }
 
+export function setFeedbackArchived(kind: "request" | "note", id: string, archived: boolean) {
+  const table = kind === "request" ? "feedback_requests" : "feedback_notes";
+  run(`UPDATE ${table} SET archived = ? WHERE id = ?`, archived ? 1 : 0, id);
+}
+
 export function openRequestCount() {
-  return one<{ n: number }>("SELECT COUNT(*) AS n FROM feedback_requests WHERE status = 'open'")?.n ?? 0;
+  return one<{ n: number }>("SELECT COUNT(*) AS n FROM feedback_requests WHERE status = 'open' AND archived = 0")?.n ?? 0;
 }
 
 export type MagicLink = {

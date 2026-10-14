@@ -68,8 +68,14 @@ export function BookMark() {
     }
 
     function onPointerDown(event: PointerEvent) {
-      scene!.setPointerCapture(event.pointerId);
+      downX = event.clientX;
+      downY = event.clientY;
       pointing = true;
+      try {
+        scene!.setPointerCapture(event.pointerId);
+      } catch {
+        pointing = true;
+      }
       aim(event.clientX, event.clientY);
     }
 
@@ -79,7 +85,24 @@ export function BookMark() {
       aim(event.clientX, event.clientY);
     }
 
-    function release() {
+    let taps = 0;
+    let lastTap = 0;
+    let downX = 0;
+    let downY = 0;
+
+    function release(event?: PointerEvent) {
+      if (event && event.type === "pointerup") {
+        const moved = Math.hypot(event.clientX - downX, event.clientY - downY);
+        if (moved < 14) {
+          const now = performance.now();
+          taps = now - lastTap < 1600 ? taps + 1 : 1;
+          lastTap = now;
+          if (taps >= 5) {
+            taps = 0;
+            window.dispatchEvent(new Event("lessons:broom"));
+          }
+        }
+      }
       pointing = false;
     }
 

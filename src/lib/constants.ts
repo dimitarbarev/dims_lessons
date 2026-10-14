@@ -1,7 +1,7 @@
 export const SUBJECTS = ["math", "english", "informatics", "conditioning"] as const;
 export const PLATFORMS = ["paper", "notes", "physical"] as const;
 export const LOCATIONS = ["in_person", "online"] as const;
-export const BILLING_MODES = ["per_lesson", "prepaid"] as const;
+export const BILLING_MODES = ["per_lesson", "per_hour", "prepaid"] as const;
 export const KINDS = ["child", "adult"] as const;
 
 export type Subject = (typeof SUBJECTS)[number];

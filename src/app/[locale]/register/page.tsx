@@ -49,6 +49,15 @@ export default async function RegisterPage({
               optional={common("optional")}
             />
             <Field label={t("childName")} name="childName" required />
+            <SelectField
+              label={t("portrait")}
+              name="portrait"
+              defaultValue="girl"
+              options={[
+                { value: "girl", label: t("girl") },
+                { value: "boy", label: t("boy") },
+              ]}
+            />
             <SelectField label={t("subject")} name="subject" defaultValue="math" options={options.subjects} />
             <Field label={t("school")} name="school" optional={common("optional")} />
             <Field label={t("grade")} name="grade" optional={common("optional")} />

@@ -2,7 +2,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { EmptyState } from "@/components/empty-state";
 import { requireSession } from "@/lib/auth";
 import { getClient, listLessons } from "@/lib/db";
-import { formatDay } from "@/lib/format";
+import { formatCode, formatDay } from "@/lib/format";
 import { choiceOptions, labelOf } from "@/lib/labels";
 
 export default async function StudentHomePage() {
@@ -23,6 +23,7 @@ export default async function StudentHomePage() {
       <p className="kicker">{t("kicker")}</p>
       <h1 className="mt-2 font-display text-4xl sm:text-5xl">{client.name}</h1>
       <p className="mt-2 text-soft">{t("title")}</p>
+      {client.public_code ? <p className="mt-3 text-sm tracking-[0.28em] text-soft">{t("code")} {formatCode(client.public_code)}</p> : null}
 
       <section className="mt-6">
         <h2 className="mb-3 text-sm font-bold tracking-[0.14em] text-soft uppercase">{t("todo")}</h2>
@@ -43,7 +44,10 @@ export default async function StudentHomePage() {
         <ul className="space-y-3">
           {lessons.map((lesson) => (
             <li key={lesson.id} className="rounded-2xl bg-ivory p-4 shadow-card">
-              <p className="font-bold">{formatDay(lesson.occurred_on, locale)}</p>
+              <p className="font-bold">
+                {formatDay(lesson.occurred_on, locale)}
+                {lesson.duration_hours ? ` · ${t("hours", { count: lesson.duration_hours })}` : ""}
+              </p>
               <p className="text-sm text-soft">
                 {labelOf(options.subjects, lesson.subject)} · {labelOf(options.platforms, lesson.platform)} ·{" "}
                 {labelOf(options.locations, lesson.location)}

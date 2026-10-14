@@ -1,5 +1,5 @@
 import { getLocale, getTranslations } from "next-intl/server";
-import { EmptyState } from "@/components/empty-state";
+import { FeedbackBoard, type FeedbackTicket } from "@/components/feedback-board";
 import { listFeedbackNotes, listFeedbackRequests } from "@/lib/db";
 import { formatDay } from "@/lib/format";
 
@@ -8,54 +8,80 @@ export default async function TeacherFeedbackPage() {
   const locale = await getLocale();
   const notes = listFeedbackNotes();
   const requests = listFeedbackRequests();
+  const requestTickets = requests.map((request) => ({
+    id: request.id,
+    kind: "request",
+    who: request.parent_name ?? "",
+    about: request.client_name ?? "",
+    title: request.open_question,
+    body: request.open_answer,
+    date: formatDay(request.created_at, locale),
+    mood: request.status === "answered" ? request.overall : null,
+    scores:
+      request.status === "answered"
+        ? [
+            { label: t("pace"), value: request.pace ?? 3 },
+            { label: t("following"), value: request.following_score ?? 3 },
+            { label: t("homework"), value: request.homework_score ?? 3 },
+          ]
+        : [],
+    archived: request.archived === 1,
+    waiting: request.status !== "answered",
+  }));
+
+  const noteTickets = notes.map((note) => ({
+    id: note.id,
+    kind: "note",
+    who: note.parent_name,
+    about: note.client_name ?? "",
+    title: note.body,
+    body: "",
+    date: formatDay(note.created_at, locale),
+    mood: null,
+    scores: [],
+    archived: note.archived === 1,
+    waiting: false,
+  }));
+
+  const sent = requestTickets.filter((ticket) => ticket.waiting && !ticket.archived);
+  const received = [
+    ...requestTickets.filter((ticket) => !ticket.waiting && !ticket.archived),
+    ...noteTickets.filter((ticket) => !ticket.archived),
+  ];
+  const archived = [...requestTickets, ...noteTickets].filter((ticket) => ticket.archived);
 
   return (
     <div>
       <p className="kicker">{t("kicker")}</p>
       <h1 className="mt-2 mb-6 font-display text-4xl sm:text-5xl">{t("title")}</h1>
-      {notes.length === 0 && requests.length === 0 ? (
-        <EmptyState title={t("emptyTitle")} lead={t("emptyLead")} />
-      ) : (
-        <div className="space-y-4">
-          {requests.map((request) => (
-            <article key={request.id} className="rise rounded-2xl bg-ivory p-5 shadow-card">
-              <p className="text-sm font-bold text-soft">
-                {request.parent_name}
-                {request.client_name ? ` · ${request.client_name}` : ""} ·{" "}
-                {request.status === "answered" ? t("answered") : t("waiting")}
-              </p>
-              <h2 className="mt-1 text-xl font-bold">{request.open_question}</h2>
-              {request.status === "answered" ? (
-                <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    {t("pace")}: {request.pace}
-                  </div>
-                  <div>
-                    {t("following")}: {request.following_score}
-                  </div>
-                  <div>
-                    {t("homework")}: {request.homework_score}
-                  </div>
-                  <div>
-                    {t("overall")}: {request.overall}
-                  </div>
-                </dl>
-              ) : null}
-              {request.open_answer ? <p className="mt-3">{request.open_answer}</p> : null}
-              <p className="mt-2 text-xs text-soft">{formatDay(request.created_at, locale)}</p>
-            </article>
-          ))}
-          {notes.map((note) => (
-            <article key={note.id} className="rise rounded-2xl bg-ivory p-5 shadow-card">
-              <p className="text-sm font-bold text-soft">
-                {note.parent_name}
-                {note.client_name ? ` · ${note.client_name}` : ""} · {formatDay(note.created_at, locale)}
-              </p>
-              <p className="mt-2 text-lg">{note.body}</p>
-            </article>
-          ))}
-        </div>
-      )}
+      <FeedbackBoard
+        sent={sent.map(strip)}
+        received={received.map(strip)}
+        archived={archived.map(strip)}
+        emptyTitle={t("emptyTitle")}
+        emptyLead={t("emptyLead")}
+        labels={{
+          sent: t("sent"),
+          received: t("received"),
+          archive: t("archive"),
+          archiveAction: t("archiveAction"),
+          restore: t("restore"),
+        }}
+      />
     </div>
   );
+}
+
+function strip(ticket: {
+  id: string;
+  kind: string;
+  who: string;
+  about: string;
+  title: string;
+  body: string;
+  date: string;
+  mood: number | null;
+  scores: { label: string; value: number }[];
+}): FeedbackTicket {
+  return { ...ticket, kind: ticket.kind === "note" ? "note" : "request" };
 }

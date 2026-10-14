@@ -21,6 +21,11 @@
     "continue": "Continue",
     "devHint": "Teacher sign-in for this copy: dimi@lessons.app"
   },
+  "game": {
+    "fly": "Tap to fly",
+    "again": "Tap to try again",
+    "leave": "Close"
+  },
   "auth": {
     "signInTitle": "Sign in",
     "signInLead": "Use your email and password. A teacher, a parent, and a student each open a different place.",
@@ -57,6 +62,9 @@
     "occupation": "Occupation",
     "occupationHint": "A field or a job, whichever is easier.",
     "childName": "Child's name",
+    "portrait": "Portrait",
+    "girl": "Girl",
+    "boy": "Boy",
     "school": "School",
     "grade": "Grade",
     "interests": "Interests",
@@ -84,6 +92,7 @@
   },
   "billing": {
     "per_lesson": "Per lesson",
+    "per_hour": "Per hour",
     "prepaid": "Prepaid pack"
   },
   "kind": {
@@ -105,6 +114,10 @@
     "add": "Add a client",
     "lesson": "Lesson",
     "saved": "Saved",
+    "lengthTitle": "How long was it?",
+    "lengthLead": "One hour, an hour and a half, two hours, or any other length.",
+    "otherLength": "Other length",
+    "hoursLabel": "Hours",
     "emptyTitle": "No clients yet",
     "emptyLead": "Add the first student. A lesson after that is one tap."
   },
@@ -126,6 +139,14 @@
     "platform": "Platform",
     "place": "Where",
     "price": "Price per lesson",
+    "priceHour": "Price per hour",
+    "duration": "Length in hours",
+    "hours": "{count} h",
+    "code": "Code",
+    "paysSelf": "Pays for themselves",
+    "linkCode": "Link with a code",
+    "linkCodeHint": "Six digits from their profile.",
+    "markSelf": "They pay for themselves",
     "billing": "Billing",
     "packSize": "Lessons in the pack",
     "amountNow": "Amount received now",
@@ -172,6 +193,23 @@
     "notes": "Notes from the family",
     "noNotes": "No feedback yet.",
     "setPrice": "Add a price per lesson so an open balance can be calculated.",
+    "close": "Close",
+    "widgetLesson": "This lesson",
+    "widgetWrite": "Write what you covered",
+    "widgetPack": "Pack",
+    "widgetBalance": "Balance",
+    "widgetLessons": "Lessons",
+    "widgetPayments": "Payments",
+    "widgetProfile": "Profile",
+    "widgetPin": "PIN",
+    "widgetParents": "Parents",
+    "widgetFeedback": "Feedback",
+    "widgetNotes": "Notes",
+    "leftWord": "Left",
+    "overWord": "Over the pack",
+    "openShort": "Open",
+    "creditShort": "Credit",
+    "pinOff": "No student sign-in",
     "back": "Today"
   },
   "signups": {
@@ -189,6 +227,16 @@
     "title": "How the lessons feel",
     "emptyTitle": "No feedback yet",
     "emptyLead": "Ask a parent from their child's page, or wait for a note.",
+    "sent": "Sent",
+    "received": "Received",
+    "archive": "Archive",
+    "archiveAction": "Archive",
+    "restore": "Put back",
+    "mood1": "Quiet",
+    "mood2": "Uneven",
+    "mood3": "Steady",
+    "mood4": "Bright",
+    "mood5": "Glad",
     "pace": "Pace",
     "following": "Following the material",
     "homework": "Homework clarity",
@@ -218,7 +266,10 @@
     "phone": "Phone",
     "currency": "Currency",
     "save": "Save",
-    "saved": "Saved."
+    "saved": "Saved.",
+    "code": "Your code",
+    "edit": "Edit",
+    "cancel": "Cancel"
   },
   "parent": {
     "kicker": "09  Your children",
@@ -229,6 +280,7 @@
     "teacher": "Teacher",
     "noPhone": "Your teacher has not added a phone number yet.",
     "readOnly": "You can look, and you can leave feedback. Lessons stay as the teacher wrote them.",
+    "code": "Your code",
     "homework": "Homework",
     "materials": "Materials",
     "noLessons": "No lessons yet.",
@@ -237,19 +289,22 @@
   "studentHome": {
     "kicker": "10  Your lessons",
     "title": "Homework and what you studied",
+    "code": "Your code",
     "todo": "To do",
     "history": "Lessons",
     "emptyTitle": "Nothing here yet",
     "emptyLead": "After a lesson, homework will show up on this page.",
     "noHomework": "No homework waiting.",
     "materials": "Materials",
-    "homework": "Homework"
+    "homework": "Homework",
+    "hours": "{count} h"
   },
   "errors": {
     "required": "Add the missing required fields.",
     "emailTaken": "That email is already used.",
     "invalidAmount": "Enter a valid amount.",
-    "invalidPin": "Use 4 to 6 digits for the PIN."
+    "invalidPin": "Use 4 to 6 digits for the PIN.",
+    "unknownCode": "That code does not match a profile."
   },
   "common": {
     "optional": "Optional"

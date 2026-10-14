@@ -34,6 +34,20 @@ export function parseCount(raw: string): number | null {
   return Number.parseInt(cleaned, 10);
 }
 
+export function parseHours(raw: string): number | null {
+  const cleaned = raw.trim().replace(",", ".");
+  if (!cleaned || !/^\d+(\.\d)?$/.test(cleaned)) return null;
+  const hours = Math.round(Number.parseFloat(cleaned) * 10) / 10;
+  if (hours <= 0 || hours > 12) return null;
+  return hours;
+}
+
+export function formatCode(code: string) {
+  const digits = code.replace(/\D/g, "");
+  if (digits.length !== 6) return code;
+  return `${digits.slice(0, 3)} ${digits.slice(3)}`;
+}
+
 export function isEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }

@@ -27,6 +27,7 @@ import {
   getLesson,
   getPayment,
   getRegistration,
+  getParentByCode,
   getTeacherByEmail,
   insertClient,
   insertFeedbackNote,
@@ -35,7 +36,9 @@ import {
   insertPayment,
   insertRegistration,
   linkParent,
+  markPaysForSelf,
   parentLinkedTo,
+  setFeedbackArchived,
   setRegistrationStatus,
   setStudentPin,
   updateClient,
@@ -44,7 +47,7 @@ import {
   updateTeacherLocale,
   upsertParent,
 } from "./db";
-import { isEmail, parseCount, parseMoney, todayISO } from "./format";
+import { isEmail, parseCount, parseHours, parseMoney, todayISO } from "./format";
 
 function refresh() {
   revalidatePath("/en", "layout");
@@ -151,6 +154,7 @@ export async function submitRegistration(form: FormData) {
     interests: field(form, "interests"),
     ambitions: field(form, "ambitions"),
     subject,
+    portrait: field(form, "portrait") === "boy" ? "boy" : "girl",
   });
   refresh();
   await go("/register", { sent: "1" });
@@ -226,8 +230,9 @@ async function ownedClient(clientId: string) {
   return must(client);
 }
 
-export async function logQuickLesson(clientId: string) {
+export async function logQuickLesson(clientId: string, hours: number) {
   const client = await ownedClient(clientId);
+  if (!Number.isFinite(hours) || hours <= 0 || hours > 12) return;
   insertLesson({
     clientId: client.id,
     occurredOn: todayISO(),
@@ -236,6 +241,7 @@ export async function logQuickLesson(clientId: string) {
     location: client.location_default,
     materials: "",
     homework: "",
+    durationHours: Math.round(hours * 10) / 10,
   });
   refresh();
 }
@@ -244,7 +250,10 @@ export async function logDetailedLesson(form: FormData) {
   const client = await ownedClient(field(form, "clientId"));
   const picked = choices(form);
   const date = field(form, "date") || todayISO();
-  if (!picked || !/^\d{4}-\d{2}-\d{2}$/.test(date)) await go(`/clients/${client.id}`, { error: "required" });
+  const hours = parseHours(field(form, "duration") || "1");
+  if (!picked || !/^\d{4}-\d{2}-\d{2}$/.test(date) || hours === null) {
+    await go(`/clients/${client.id}`, { error: "required" });
+  }
   const choice = must(picked);
   insertLesson({
     clientId: client.id,
@@ -254,6 +263,7 @@ export async function logDetailedLesson(form: FormData) {
     location: choice.location,
     materials: field(form, "materials"),
     homework: field(form, "homework"),
+    durationHours: must(hours),
   });
   refresh();
   await go(`/clients/${client.id}`);
@@ -357,6 +367,29 @@ export async function linkParentAction(form: FormData) {
   await go(`/clients/${client.id}`);
 }
 
+export async function linkParentByCode(form: FormData) {
+  const client = await ownedClient(field(form, "clientId"));
+  const code = field(form, "code").replace(/\s/g, "");
+  if (!/^\d{6}$/.test(code)) await go(`/clients/${client.id}`, { error: "unknownCode" });
+  if (code === client.public_code) {
+    markPaysForSelf(client.id);
+    refresh();
+    await go(`/clients/${client.id}`, { saved: "1" });
+  }
+  const parent = getParentByCode(code);
+  if (!parent) await go(`/clients/${client.id}`, { error: "unknownCode" });
+  linkParent(client.id, must(parent).id);
+  refresh();
+  await go(`/clients/${client.id}`, { saved: "1" });
+}
+
+export async function markSelfPayer(form: FormData) {
+  const client = await ownedClient(field(form, "clientId"));
+  markPaysForSelf(client.id);
+  refresh();
+  await go(`/clients/${client.id}`, { saved: "1" });
+}
+
 export async function acceptRegistration(form: FormData) {
   const session = await requireTeacher();
   const found = getRegistration(field(form, "id"));
@@ -397,6 +430,16 @@ export async function declineRegistration(form: FormData) {
   if (registration && registration.status === "pending") setRegistrationStatus(registration.id, "declined");
   refresh();
   await go("/registrations");
+}
+
+export async function archiveFeedback(form: FormData) {
+  await requireTeacher();
+  const kind = field(form, "kind") === "note" ? "note" : "request";
+  const id = field(form, "id");
+  if (!id) await go("/feedback");
+  setFeedbackArchived(kind, id, field(form, "archived") !== "0");
+  refresh();
+  await go("/feedback");
 }
 
 export async function saveSettings(form: FormData) {

@@ -1,7 +1,7 @@
 import { getLocale, getTranslations } from "next-intl/server";
 import { ErrorBanner } from "@/components/error-banner";
 import { Area, primaryButton, SelectField } from "@/components/fields";
-import { Scale } from "@/components/scale";
+import { MoodScale } from "@/components/mood-mark";
 import { addFeedbackNote, answerRequest } from "@/lib/actions";
 import { requireSession } from "@/lib/auth";
 import { listClientsOfParent, listNotesForParent, listRequestsForParent } from "@/lib/db";
@@ -21,6 +21,7 @@ export default async function ParentFeedbackPage({
   const notes = listNotesForParent(session.user_id);
   const requests = listRequestsForParent(session.user_id);
   const open = requests.filter((request) => request.status === "open");
+  const marks = [1, 2, 3, 4, 5].map((value) => ({ value, name: t(`mood${value}` as "mood1") }));
 
   return (
     <div className="space-y-5">
@@ -36,10 +37,10 @@ export default async function ParentFeedbackPage({
           <h2 className="font-display text-2xl">{request.open_question}</h2>
           {request.client_name ? <p className="text-sm text-soft">{request.client_name}</p> : null}
           <p className="text-xs text-soft">{t("scaleHint")}</p>
-          <Scale name="pace" label={t("pace")} />
-          <Scale name="following" label={t("following")} />
-          <Scale name="homework" label={t("homework")} />
-          <Scale name="overall" label={t("overall")} />
+          <MoodScale name="pace" label={t("pace")} marks={marks} />
+          <MoodScale name="following" label={t("following")} marks={marks} />
+          <MoodScale name="homework" label={t("homework")} marks={marks} />
+          <MoodScale name="overall" label={t("overall")} marks={marks} />
           <Area label={t("answer")} name="openAnswer" />
           <button className={primaryButton} type="submit">
             {t("sendAnswer")}
