@@ -7,6 +7,8 @@ import { logQuickLesson } from "@/lib/actions";
 
 const PRESETS = [1, 1.5, 2] as const;
 
+type Choice = { value: string; label: string };
+
 export function LessonButton({
   clientId,
   label,
@@ -17,6 +19,15 @@ export function LessonButton({
   hoursLabel,
   saveLabel,
   closeLabel,
+  platformLabel,
+  placeLabel,
+  materialsLabel,
+  homeworkLabel,
+  optionalLabel,
+  platforms,
+  places,
+  defaultPlatform,
+  defaultPlace,
 }: {
   clientId: string;
   label: string;
@@ -27,11 +38,24 @@ export function LessonButton({
   hoursLabel: string;
   saveLabel: string;
   closeLabel: string;
+  platformLabel: string;
+  placeLabel: string;
+  materialsLabel: string;
+  homeworkLabel: string;
+  optionalLabel: string;
+  platforms: Choice[];
+  places: Choice[];
+  defaultPlatform: string;
+  defaultPlace: string;
 }) {
   const [open, setOpen] = useState(false);
   const [saved, setSaved] = useState(false);
   const [choice, setChoice] = useState<number | "other">(1);
   const [custom, setCustom] = useState("");
+  const [platform, setPlatform] = useState(defaultPlatform);
+  const [place, setPlace] = useState(defaultPlace);
+  const [materials, setMaterials] = useState("");
+  const [homework, setHomework] = useState("");
   const [pending, start] = useTransition();
   const router = useRouter();
 
@@ -46,8 +70,16 @@ export function LessonButton({
     const length = hours();
     if (length === null) return;
     start(async () => {
-      await logQuickLesson(clientId, length);
+      await logQuickLesson(clientId, {
+        hours: length,
+        platform,
+        location: place,
+        materials,
+        homework,
+      });
       setOpen(false);
+      setMaterials("");
+      setHomework("");
       setSaved(true);
       router.refresh();
       window.setTimeout(() => setSaved(false), 1400);
@@ -66,52 +98,115 @@ export function LessonButton({
       </button>
       {open
         ? createPortal(
-        <div className="fixed inset-0 z-40">
-          <button type="button" className="absolute inset-0 bg-ink/30 backdrop-blur-[2px]" aria-label={closeLabel} onClick={() => setOpen(false)} />
-          <div className="pointer-events-none relative flex h-full items-end justify-center p-3 sm:items-center sm:p-8">
-            <div role="dialog" aria-modal="true" aria-labelledby={`length-${clientId}`} className="rise pointer-events-auto w-full max-w-sm rounded-[28px] bg-ivory p-5 shadow-card">
-              <h2 id={`length-${clientId}`} className="font-display text-3xl">{title}</h2>
-              <p className="mt-2 text-sm text-soft">{lead}</p>
-              <div className="mt-4 grid grid-cols-3 gap-2">
-                {PRESETS.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => setChoice(preset)}
-                    className={`min-h-12 rounded-2xl text-sm ${choice === preset ? "bg-ink text-paper" : "bg-paper text-ink"}`}
-                  >
-                    {preset}
-                  </button>
-                ))}
+            <div className="fixed inset-0 z-40">
+              <button type="button" className="absolute inset-0 bg-ink/30 backdrop-blur-[2px]" aria-label={closeLabel} onClick={() => setOpen(false)} />
+              <div className="pointer-events-none relative flex h-full items-end justify-center p-3 sm:items-center sm:p-8">
+                <div
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby={`length-${clientId}`}
+                  className="rise pointer-events-auto flex max-h-[min(40rem,calc(100dvh-1.5rem))] w-full max-w-md flex-col rounded-[28px] bg-ivory p-5 shadow-card"
+                >
+                  <div className="overflow-y-auto">
+                  <h2 id={`length-${clientId}`} className="font-display text-3xl">
+                    {title}
+                  </h2>
+                  <p className="mt-2 text-sm text-soft">{lead}</p>
+                  <div className="mt-4 grid grid-cols-3 gap-2">
+                    {PRESETS.map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setChoice(preset)}
+                        className={`min-h-12 rounded-2xl text-sm ${choice === preset ? "bg-ink text-paper" : "bg-paper text-ink"}`}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                  <label className="mt-4 block">
+                    <span className="label">{otherLabel}</span>
+                    <input
+                      className="field"
+                      inputMode="decimal"
+                      value={choice === "other" ? custom : ""}
+                      placeholder={hoursLabel}
+                      onFocus={() => setChoice("other")}
+                      onChange={(event) => {
+                        setChoice("other");
+                        setCustom(event.target.value);
+                      }}
+                    />
+                  </label>
+                  <div className="mt-4 grid gap-4">
+                    <ChoiceField label={platformLabel} optional={optionalLabel} value={platform} options={platforms} onChange={setPlatform} />
+                    <ChoiceField label={placeLabel} optional={optionalLabel} value={place} options={places} onChange={setPlace} />
+                    <label className="block">
+                      <span className="label">
+                        {materialsLabel}
+                        <span className="ml-2 font-semibold text-soft">{optionalLabel}</span>
+                      </span>
+                      <input className="field" value={materials} onChange={(event) => setMaterials(event.target.value)} />
+                    </label>
+                    <label className="block">
+                      <span className="label">
+                        {homeworkLabel}
+                        <span className="ml-2 font-semibold text-soft">{optionalLabel}</span>
+                      </span>
+                      <input className="field" value={homework} onChange={(event) => setHomework(event.target.value)} />
+                    </label>
+                  </div>
+                  </div>
+                  <div className="mt-5 flex items-center justify-between gap-3">
+                    <button type="button" className="nav-link text-sm text-ink/70" onClick={() => setOpen(false)}>
+                      {closeLabel}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ink inline-flex min-h-10 items-center rounded-full px-4 text-sm"
+                      disabled={pending || hours() === null}
+                      onClick={commit}
+                    >
+                      {saveLabel}
+                    </button>
+                  </div>
+                </div>
               </div>
-              <label className="mt-4 block">
-                <span className="label">{otherLabel}</span>
-                <input
-                  className="field"
-                  inputMode="decimal"
-                  value={choice === "other" ? custom : ""}
-                  placeholder={hoursLabel}
-                  onFocus={() => setChoice("other")}
-                  onChange={(event) => {
-                    setChoice("other");
-                    setCustom(event.target.value);
-                  }}
-                />
-              </label>
-              <div className="mt-5 flex items-center justify-between gap-3">
-                <button type="button" className="nav-link text-sm text-ink/70" onClick={() => setOpen(false)}>
-                  {closeLabel}
-                </button>
-                <button type="button" className="btn btn-ink inline-flex min-h-10 items-center rounded-full px-4 text-sm" disabled={pending || hours() === null} onClick={commit}>
-                  {saveLabel}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>,
-          document.body,
-        )
+            </div>,
+            document.body,
+          )
         : null}
     </>
+  );
+}
+
+function ChoiceField({
+  label,
+  optional,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  optional: string;
+  value: string;
+  options: Choice[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="label">
+        {label}
+        <span className="ml-2 font-semibold text-soft">{optional}</span>
+      </span>
+      <select className="field" value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">—</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

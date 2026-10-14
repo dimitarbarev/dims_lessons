@@ -5,15 +5,19 @@ import { ClientBoard, type PanelId, type StatusTone, type WidgetModel } from "@/
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { ErrorBanner } from "@/components/error-banner";
 import { Area, butterButton, Field, primaryButton, SelectField } from "@/components/fields";
+import { StudentProfile } from "@/components/student-profile";
 import { Link } from "@/i18n/navigation";
 import {
   addPayment,
+  archiveStudent,
   linkParentAction,
   linkParentByCode,
   logDetailedLesson,
   markSelfPayer,
   removeLesson,
   removePayment,
+  removeStudent,
+  restoreStudent,
   savePin,
   saveProfile,
   sendFeedbackRequest,
@@ -36,7 +40,7 @@ export default async function ClientPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; saved?: string }>;
+  searchParams: Promise<{ error?: string; saved?: string; edit?: string }>;
 }) {
   const { id } = await params;
   const query = await searchParams;
@@ -78,14 +82,31 @@ export default async function ClientPage({
     money,
   });
   const profileBits = [labelOf(options.kinds, client.kind), client.school, client.grade].filter(Boolean).join(" · ");
+  const portrait = client.portrait === "boy" ? "boy" : "girl";
+  const profileFacts = [
+    { label: t("code"), value: client.public_code ? formatCode(client.public_code) : "—" },
+    { label: t("kind"), value: labelOf(options.kinds, client.kind) },
+    { label: t("subject"), value: labelOf(options.subjects, client.subject_default) },
+    { label: t("platform"), value: labelOf(options.platforms, client.platform_default) },
+    { label: t("place"), value: labelOf(options.locations, client.location_default) },
+    { label: t("billing"), value: labelOf(options.billing, client.billing_mode) },
+    { label: client.billing_mode === "per_hour" ? t("priceHour") : t("price"), value: money(client.price_cents) },
+    { label: t("portrait"), value: portrait === "boy" ? t("boy") : t("girl") },
+    ...(client.school ? [{ label: t("school"), value: client.school }] : []),
+    ...(client.grade ? [{ label: t("grade"), value: client.grade }] : []),
+    ...(client.interests ? [{ label: t("interests"), value: client.interests }] : []),
+    ...(client.ambitions ? [{ label: t("ambitions"), value: client.ambitions }] : []),
+  ];
 
   const widgets: WidgetModel[] = [
     {
       id: "lesson",
       panel: "lesson",
       label: t("widgetLesson"),
-      figure: formatDay(todayISO(), locale),
-      caption: meta,
+      figure: latestLesson ? formatDay(latestLesson.occurred_on, locale) : "—",
+      caption: latestLesson
+        ? [labelOf(options.subjects, latestLesson.subject), latestLesson.materials || latestLesson.homework].filter(Boolean).join(" · ")
+        : t("noLessons"),
       detail: t("widgetWrite"),
       tone: "feature",
       size: "hero",
@@ -215,15 +236,33 @@ export default async function ClientPage({
         <h1 className="font-display text-4xl sm:text-5xl">{client.name}</h1>
         <p className="mt-1 text-soft">{meta}</p>
         {client.public_code ? <p className="mt-3 text-sm tracking-[0.28em] text-soft">{formatCode(client.public_code)}</p> : null}
+        {client.status === "archived" ? <p className="mt-3 text-sm font-semibold">{t("archived")}</p> : null}
       </header>
       <ClientBoard
         widgets={widgets}
         titles={titles}
         closeLabel={t("close")}
-        initialPanel={panelForError(query.error)}
+        initialPanel={query.edit === "profile" ? "profile" : panelForError(query.error)}
         notice={notice}
         panels={{
           lesson: (
+            <div className="space-y-6">
+              {latestLesson ? (
+                <div className="rounded-3xl bg-paper px-4 py-3">
+                  <p className="font-bold">
+                    {formatDay(latestLesson.occurred_on, locale)} · {t("hours", { count: latestLesson.duration_hours || 1 })}
+                  </p>
+                  <p className="text-sm text-soft">
+                    {labelOf(options.subjects, latestLesson.subject)}
+                    {latestLesson.platform ? ` · ${labelOf(options.platforms, latestLesson.platform)}` : ""}
+                    {latestLesson.location ? ` · ${labelOf(options.locations, latestLesson.location)}` : ""}
+                  </p>
+                  {latestLesson.materials ? <p className="mt-1 text-sm">{latestLesson.materials}</p> : null}
+                  {latestLesson.homework ? <p className="mt-1 text-sm font-semibold">{latestLesson.homework}</p> : null}
+                </div>
+              ) : (
+                <p className="text-soft">{t("noLessons")}</p>
+              )}
             <form action={logDetailedLesson} className="grid gap-4">
               <input type="hidden" name="clientId" value={client.id} />
               <input type="hidden" name="kind" value={client.kind} />
@@ -241,6 +280,7 @@ export default async function ClientPage({
                 </button>
               </div>
             </form>
+            </div>
           ),
           payments: (
             <div className="space-y-6">
@@ -251,10 +291,10 @@ export default async function ClientPage({
                 <input type="hidden" name="clientId" value={client.id} />
                 <Field label={t("date")} name="date" type="date" defaultValue={todayISO()} required />
                 <Field label={t("amount")} name="amount" defaultValue="0" inputMode="decimal" />
-                {client.billing_mode === "prepaid" ? (
-                  <Field label={t("lessonsAdded")} name="lessonsAdded" defaultValue="0" inputMode="numeric" />
+                {client.billing_mode === "per_hour" ? (
+                  <Field label={t("hoursAdded")} name="hoursAdded" defaultValue="0" inputMode="decimal" />
                 ) : (
-                  <input type="hidden" name="lessonsAdded" value="0" />
+                  <Field label={t("lessonsAdded")} name="lessonsAdded" defaultValue="0" inputMode="numeric" />
                 )}
                 <div className="justify-self-start sm:col-span-2">
                   <button className={butterButton} type="submit">
@@ -272,12 +312,13 @@ export default async function ClientPage({
                         <p className="font-bold">{formatDay(payment.paid_on, locale)}</p>
                         <p className="text-sm text-soft">
                           {money(payment.amount_cents)}
+                          {payment.hours_added ? ` · +${t("hours", { count: payment.hours_added })}` : ""}
                           {payment.lessons_added ? ` · +${payment.lessons_added}` : ""}
                         </p>
                       </div>
                       <form action={removePayment}>
                         <input type="hidden" name="paymentId" value={payment.id} />
-                        <ConfirmSubmit label={t("remove")} message={t("removeConfirm")} />
+                        <ConfirmSubmit label={t("remove")} title={t("removeAsk")} message={t("removeConfirm")} cancel={t("cancel")} />
                       </form>
                     </li>
                   ))}
@@ -305,7 +346,7 @@ export default async function ClientPage({
                       </div>
                       <form action={removeLesson}>
                         <input type="hidden" name="lessonId" value={lesson.id} />
-                        <ConfirmSubmit label={t("remove")} message={t("removeConfirm")} />
+                        <ConfirmSubmit label={t("remove")} title={t("removeAsk")} message={t("removeConfirm")} cancel={t("cancel")} />
                       </form>
                     </div>
                   </li>
@@ -314,34 +355,83 @@ export default async function ClientPage({
             </div>
           ),
           profile: (
-            <form action={saveProfile} className="grid gap-4 sm:grid-cols-2">
-              <input type="hidden" name="clientId" value={client.id} />
-              <Field label={t("name")} name="name" defaultValue={client.name} required />
-              <SelectField label={t("kind")} name="kind" defaultValue={client.kind} options={options.kinds} />
-              <SelectField label={t("subject")} name="subject" defaultValue={client.subject_default} options={options.subjects} />
-              <SelectField label={t("platform")} name="platform" defaultValue={client.platform_default} options={options.platforms} />
-              <SelectField label={t("place")} name="location" defaultValue={client.location_default} options={options.locations} />
-              <Field
-                label={client.billing_mode === "per_hour" ? t("priceHour") : t("price")}
-                name="price"
-                defaultValue={price}
-                inputMode="decimal"
-              />
-              <SelectField label={t("billing")} name="billing" defaultValue={client.billing_mode} options={options.billing} />
-              <Field label={t("school")} name="school" defaultValue={client.school} />
-              <Field label={t("grade")} name="grade" defaultValue={client.grade} />
-              <div className="sm:col-span-2">
-                <Area label={t("interests")} name="interests" defaultValue={client.interests} />
-              </div>
-              <div className="sm:col-span-2">
-                <Area label={t("ambitions")} name="ambitions" defaultValue={client.ambitions} />
-              </div>
-              <div className="justify-self-start sm:col-span-2">
-                <button className={primaryButton} type="submit">
-                  {t("saveProfile")}
-                </button>
-              </div>
-            </form>
+            <StudentProfile
+              portrait={portrait}
+              name={client.name}
+              facts={profileFacts}
+              editLabel={settings("edit")}
+              cancelLabel={settings("cancel")}
+              startEditing={query.edit === "profile"}
+              footer={
+                <>
+                  {client.status === "archived" ? (
+                    <form action={restoreStudent}>
+                      <input type="hidden" name="clientId" value={client.id} />
+                      <ConfirmSubmit
+                        label={t("restoreStudent")}
+                        title={t("restoreAsk")}
+                        message={t("restoreLead")}
+                        cancel={t("cancel")}
+                        className="text-sm font-bold"
+                      />
+                    </form>
+                  ) : (
+                    <form action={archiveStudent}>
+                      <input type="hidden" name="clientId" value={client.id} />
+                      <ConfirmSubmit
+                        label={t("archiveStudent")}
+                        title={t("archiveAsk")}
+                        message={t("archiveLead")}
+                        cancel={t("cancel")}
+                        className="text-sm font-bold"
+                      />
+                    </form>
+                  )}
+                  <form action={removeStudent}>
+                    <input type="hidden" name="clientId" value={client.id} />
+                    <ConfirmSubmit label={t("removeStudent")} title={t("removeAsk")} message={t("removeStudentConfirm")} cancel={t("cancel")} />
+                  </form>
+                </>
+              }
+            >
+              <form action={saveProfile} className="grid gap-4 sm:grid-cols-2">
+                <input type="hidden" name="clientId" value={client.id} />
+                <Field label={t("name")} name="name" defaultValue={client.name} required />
+                <SelectField label={t("kind")} name="kind" defaultValue={client.kind} options={options.kinds} />
+                <SelectField label={t("subject")} name="subject" defaultValue={client.subject_default} options={options.subjects} />
+                <SelectField label={t("platform")} name="platform" defaultValue={client.platform_default} options={options.platforms} />
+                <SelectField label={t("place")} name="location" defaultValue={client.location_default} options={options.locations} />
+                <Field
+                  label={client.billing_mode === "per_hour" ? t("priceHour") : t("price")}
+                  name="price"
+                  defaultValue={price}
+                  inputMode="decimal"
+                />
+                <SelectField label={t("billing")} name="billing" defaultValue={client.billing_mode} options={options.billing} />
+                <SelectField
+                  label={t("portrait")}
+                  name="portrait"
+                  defaultValue={portrait}
+                  options={[
+                    { value: "girl", label: t("girl") },
+                    { value: "boy", label: t("boy") },
+                  ]}
+                />
+                <Field label={t("school")} name="school" defaultValue={client.school} />
+                <Field label={t("grade")} name="grade" defaultValue={client.grade} />
+                <div className="sm:col-span-2">
+                  <Area label={t("interests")} name="interests" defaultValue={client.interests} />
+                </div>
+                <div className="sm:col-span-2">
+                  <Area label={t("ambitions")} name="ambitions" defaultValue={client.ambitions} />
+                </div>
+                <div className="justify-self-start sm:col-span-2">
+                  <button className={primaryButton} type="submit">
+                    {t("saveProfile")}
+                  </button>
+                </div>
+              </form>
+            </StudentProfile>
           ),
           pin: (
             <form action={savePin} className="grid gap-4">

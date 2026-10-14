@@ -42,6 +42,15 @@ export function parseHours(raw: string): number | null {
   return hours;
 }
 
+export function parsePackHours(raw: string): number | null {
+  const cleaned = raw.trim().replace(",", ".");
+  if (!cleaned) return 0;
+  if (!/^\d+(\.\d)?$/.test(cleaned)) return null;
+  const hours = Math.round(Number.parseFloat(cleaned) * 10) / 10;
+  if (hours < 0 || hours > 500) return null;
+  return hours;
+}
+
 export function formatCode(code: string) {
   const digits = code.replace(/\D/g, "");
   if (digits.length !== 6) return code;

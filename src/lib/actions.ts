@@ -18,6 +18,7 @@ import {
   authenticate,
   clearStudentPin,
   createSession,
+  deleteClient,
   deleteLesson,
   deletePayment,
   deleteSession,
@@ -38,6 +39,7 @@ import {
   linkParent,
   markPaysForSelf,
   parentLinkedTo,
+  setClientStatus,
   setFeedbackArchived,
   setRegistrationStatus,
   setStudentPin,
@@ -47,7 +49,7 @@ import {
   updateTeacherLocale,
   upsertParent,
 } from "./db";
-import { isEmail, parseCount, parseHours, parseMoney, todayISO } from "./format";
+import { isEmail, parseCount, parseHours, parseMoney, parsePackHours, todayISO } from "./format";
 
 function refresh() {
   revalidatePath("/en", "layout");
@@ -165,15 +167,24 @@ export async function createClientAction(form: FormData) {
   const name = field(form, "name");
   const picked = choices(form);
   const price = parseMoney(field(form, "price"));
-  const pack = parseCount(field(form, "packSize"));
   const amount = parseMoney(field(form, "amountNow"));
-  if (!name || !picked || price === null || pack === null || amount === null) {
+  if (!name || !picked || price === null || amount === null) {
     await go("/clients/new", { error: "required" });
   }
   const choice = must(picked);
   const priceCents = must(price);
-  const packCount = must(pack);
   const amountCents = must(amount);
+  let lessonsAdded = 0;
+  let hoursAdded = 0;
+  if (choice.billing === "per_hour") {
+    const hours = parsePackHours(field(form, "packSize"));
+    if (hours === null) await go("/clients/new", { error: "required" });
+    hoursAdded = must(hours);
+  } else {
+    const pack = parseCount(field(form, "packSize"));
+    if (pack === null) await go("/clients/new", { error: "required" });
+    lessonsAdded = must(pack);
+  }
 
   const parentEmail = field(form, "parentEmail").toLowerCase();
   const parentName = field(form, "parentName");
@@ -197,14 +208,16 @@ export async function createClientAction(form: FormData) {
     grade: field(form, "grade"),
     interests: field(form, "interests"),
     ambitions: field(form, "ambitions"),
+    portrait: field(form, "portrait") === "boy" ? "boy" : "girl",
   });
 
-  if (amountCents > 0 || packCount > 0) {
+  if (amountCents > 0 || lessonsAdded > 0 || hoursAdded > 0) {
     insertPayment({
       clientId: id,
       paidOn: todayISO(),
       amountCents,
-      lessonsAdded: choice.billing === "prepaid" ? packCount : 0,
+      lessonsAdded,
+      hoursAdded,
     });
   }
 
@@ -230,17 +243,23 @@ async function ownedClient(clientId: string) {
   return must(client);
 }
 
-export async function logQuickLesson(clientId: string, hours: number) {
+export async function logQuickLesson(
+  clientId: string,
+  input: { hours: number; platform: string; location: string; materials: string; homework: string },
+) {
   const client = await ownedClient(clientId);
+  const hours = input.hours;
   if (!Number.isFinite(hours) || hours <= 0 || hours > 12) return;
+  const platform = !input.platform ? "" : isOneOf(PLATFORMS, input.platform) ? input.platform : client.platform_default;
+  const location = !input.location ? "" : isOneOf(LOCATIONS, input.location) ? input.location : client.location_default;
   insertLesson({
     clientId: client.id,
     occurredOn: todayISO(),
     subject: client.subject_default,
-    platform: client.platform_default,
-    location: client.location_default,
-    materials: "",
-    homework: "",
+    platform,
+    location,
+    materials: input.materials.trim().slice(0, 2000),
+    homework: input.homework.trim().slice(0, 2000),
     durationHours: Math.round(hours * 10) / 10,
   });
   refresh();
@@ -282,19 +301,31 @@ export async function removeLesson(form: FormData) {
 export async function addPayment(form: FormData) {
   const client = await ownedClient(field(form, "clientId"));
   const amount = parseMoney(field(form, "amount"));
-  const added = parseCount(field(form, "lessonsAdded"));
   const date = field(form, "date") || todayISO();
-  if (amount === null || added === null || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+  if (amount === null || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     await go(`/clients/${client.id}`, { error: "invalidAmount" });
   }
   const cents = must(amount);
-  const lessonsAdded = must(added);
-  if (cents === 0 && lessonsAdded === 0) await go(`/clients/${client.id}`, { error: "invalidAmount" });
+  let lessonsAdded = 0;
+  let hoursAdded = 0;
+  if (client.billing_mode === "per_hour") {
+    const hours = parsePackHours(field(form, "hoursAdded"));
+    if (hours === null) await go(`/clients/${client.id}`, { error: "invalidAmount" });
+    hoursAdded = must(hours);
+  } else {
+    const added = parseCount(field(form, "lessonsAdded"));
+    if (added === null) await go(`/clients/${client.id}`, { error: "invalidAmount" });
+    lessonsAdded = must(added);
+  }
+  if (cents === 0 && lessonsAdded === 0 && hoursAdded === 0) {
+    await go(`/clients/${client.id}`, { error: "invalidAmount" });
+  }
   insertPayment({
     clientId: client.id,
     paidOn: date,
     amountCents: cents,
-    lessonsAdded: client.billing_mode === "prepaid" ? lessonsAdded : 0,
+    lessonsAdded,
+    hoursAdded,
   });
   refresh();
   await go(`/clients/${client.id}`);
@@ -315,7 +346,7 @@ export async function saveProfile(form: FormData) {
   const name = field(form, "name");
   const picked = choices(form);
   const price = parseMoney(field(form, "price"));
-  if (!name || !picked || price === null) await go(`/clients/${client.id}`, { error: "required" });
+  if (!name || !picked || price === null) await go(`/clients/${client.id}`, { error: "required", edit: "profile" });
   const choice = must(picked);
   updateClient(client.id, {
     name,
@@ -329,9 +360,31 @@ export async function saveProfile(form: FormData) {
     grade: field(form, "grade"),
     interests: field(form, "interests"),
     ambitions: field(form, "ambitions"),
+    portrait: field(form, "portrait") === "boy" ? "boy" : "girl",
   });
   refresh();
   await go(`/clients/${client.id}`, { saved: "1" });
+}
+
+export async function archiveStudent(form: FormData) {
+  const client = await ownedClient(field(form, "clientId"));
+  setClientStatus(client.id, "archived");
+  refresh();
+  await go("/today", { view: "archive" });
+}
+
+export async function restoreStudent(form: FormData) {
+  const client = await ownedClient(field(form, "clientId"));
+  setClientStatus(client.id, "active");
+  refresh();
+  await go("/today");
+}
+
+export async function removeStudent(form: FormData) {
+  const client = await ownedClient(field(form, "clientId"));
+  deleteClient(client.id);
+  refresh();
+  await go("/today");
 }
 
 export async function savePin(form: FormData) {
@@ -410,6 +463,7 @@ export async function acceptRegistration(form: FormData) {
     grade: registration.grade,
     interests: registration.interests,
     ambitions: registration.ambitions,
+    portrait: registration.portrait === "boy" ? "boy" : "girl",
   });
   const parent = upsertParent({
     name: registration.parent_name,

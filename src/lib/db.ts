@@ -46,6 +46,7 @@ export type Client = {
   status: string;
   student_email: string | null;
   public_code: string;
+  portrait: string;
   student_pin_hash: string | null;
   student_pin_salt: string | null;
   created_at: string;
@@ -72,6 +73,7 @@ export type Payment = {
   paid_on: string;
   amount_cents: number;
   lessons_added: number;
+  hours_added: number;
   created_at: string;
 };
 
@@ -424,6 +426,8 @@ function ensureStudio() {
   ensureColumn("teachers", "password_salt", "TEXT");
   ensureColumn("parents", "password_hash", "TEXT");
   ensureColumn("parents", "password_salt", "TEXT");
+  ensureColumn("clients", "portrait", "TEXT NOT NULL DEFAULT 'girl'");
+  ensureColumn("payments", "hours_added", "REAL NOT NULL DEFAULT 0");
   ensureColumn("clients", "student_email", "TEXT");
   ensureColumn("clients", "password_hash", "TEXT");
   ensureColumn("clients", "password_salt", "TEXT");
@@ -677,8 +681,11 @@ export function transaction(fn: () => void) {
 
 function withStats(client: Client): ClientCard {
   const lessons = one<{ n: number }>("SELECT COUNT(*) AS n FROM lessons WHERE client_id = ?", client.id);
-  const payments = one<{ amount: number; added: number }>(
-    "SELECT COALESCE(SUM(amount_cents), 0) AS amount, COALESCE(SUM(lessons_added), 0) AS added FROM payments WHERE client_id = ?",
+  const payments = one<{ amount: number; added: number; hours: number }>(
+    `SELECT COALESCE(SUM(amount_cents), 0) AS amount,
+            COALESCE(SUM(lessons_added), 0) AS added,
+            COALESCE(SUM(hours_added), 0) AS hours
+     FROM payments WHERE client_id = ?`,
     client.id,
   );
   return {
@@ -690,6 +697,7 @@ function withStats(client: Client): ClientCard {
       payments?.amount ?? 0,
       payments?.added ?? 0,
       one<{ n: number }>("SELECT COALESCE(SUM(duration_hours), 0) AS n FROM lessons WHERE client_id = ?", client.id)?.n ?? 0,
+      payments?.hours ?? 0,
     ),
   };
 }
@@ -814,11 +822,27 @@ export function parentLinkedTo(parentId: string, clientId: string) {
   );
 }
 
-export function listClients(teacherId: string) {
+export function listClients(teacherId: string, status: "active" | "archived" = "active") {
   return many<Client>(
-    "SELECT * FROM clients WHERE teacher_id = ? AND status = 'active' ORDER BY name COLLATE NOCASE",
+    "SELECT * FROM clients WHERE teacher_id = ? AND status = ? ORDER BY name COLLATE NOCASE",
     teacherId,
+    status,
   ).map(withStats);
+}
+
+export function setClientStatus(id: string, status: "active" | "archived") {
+  run("UPDATE clients SET status = ? WHERE id = ?", status, id);
+}
+
+export function deleteClient(id: string) {
+  transaction(() => {
+    run("DELETE FROM lessons WHERE client_id = ?", id);
+    run("DELETE FROM payments WHERE client_id = ?", id);
+    run("DELETE FROM client_parents WHERE client_id = ?", id);
+    run("DELETE FROM feedback_notes WHERE client_id = ?", id);
+    run("DELETE FROM feedback_requests WHERE client_id = ?", id);
+    run("DELETE FROM clients WHERE id = ?", id);
+  });
 }
 
 export function getClient(id: string) {
@@ -839,13 +863,14 @@ export function insertClient(input: {
   grade: string;
   interests: string;
   ambitions: string;
+  portrait?: string;
 }) {
   const id = cryptoId();
   run(
     `INSERT INTO clients (
       id, teacher_id, name, kind, subject_default, platform_default, location_default,
-      price_cents, billing_mode, school, grade, interests, ambitions, status, public_code, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
+      price_cents, billing_mode, school, grade, interests, ambitions, status, public_code, portrait, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`,
     id,
     input.teacherId,
     input.name,
@@ -860,6 +885,7 @@ export function insertClient(input: {
     input.interests,
     input.ambitions,
     mintCode(),
+    input.portrait === "boy" ? "boy" : "girl",
     nowIso(),
   );
   return id;
@@ -879,12 +905,13 @@ export function updateClient(
     grade: string;
     interests: string;
     ambitions: string;
+    portrait: string;
   },
 ) {
   run(
     `UPDATE clients SET
       name = ?, kind = ?, subject_default = ?, platform_default = ?, location_default = ?,
-      price_cents = ?, billing_mode = ?, school = ?, grade = ?, interests = ?, ambitions = ?
+      price_cents = ?, billing_mode = ?, school = ?, grade = ?, interests = ?, ambitions = ?, portrait = ?
      WHERE id = ?`,
     input.name,
     input.kind,
@@ -897,6 +924,7 @@ export function updateClient(
     input.grade,
     input.interests,
     input.ambitions,
+    input.portrait === "boy" ? "boy" : "girl",
     id,
   );
 }
@@ -998,15 +1026,17 @@ export function insertPayment(input: {
   paidOn: string;
   amountCents: number;
   lessonsAdded: number;
+  hoursAdded?: number;
 }) {
   run(
-    `INSERT INTO payments (id, client_id, paid_on, amount_cents, lessons_added, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO payments (id, client_id, paid_on, amount_cents, lessons_added, hours_added, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
     cryptoId(),
     input.clientId,
     input.paidOn,
     input.amountCents,
     input.lessonsAdded,
+    input.hoursAdded ?? 0,
     nowIso(),
   );
 }

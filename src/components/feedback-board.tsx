@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ConfirmSubmit } from "@/components/confirm-submit";
 import { MoodMark } from "@/components/mood-mark";
 import { archiveFeedback } from "@/lib/actions";
 
@@ -27,7 +28,18 @@ export function FeedbackBoard({
   sent: FeedbackTicket[];
   received: FeedbackTicket[];
   archived: FeedbackTicket[];
-  labels: { sent: string; received: string; archive: string; archiveAction: string; restore: string };
+  labels: {
+    sent: string;
+    received: string;
+    archive: string;
+    archiveAction: string;
+    restore: string;
+    restoreAsk: string;
+    restoreLead: string;
+    archiveAsk: string;
+    archiveLead: string;
+    cancel: string;
+  };
   emptyTitle: string;
   emptyLead: string;
 }) {
@@ -61,7 +73,7 @@ export function FeedbackBoard({
           {tickets.map((ticket) => (
             <li key={`${ticket.kind}-${ticket.id}`} className={`rounded-[28px] bg-ivory p-4 shadow-card ${ticket.mood ? "sm:col-span-2" : ""}`}>
               <div className="flex items-start gap-4">
-                {ticket.mood ? <MoodMark level={ticket.mood} label={String(ticket.mood)} /> : <span className="mood rounded-full bg-paper" aria-hidden="true" />}
+                {ticket.mood ? <MoodMark level={ticket.mood} label={String(ticket.mood)} /> : <span className="mt-1 inline-block size-8 rounded-full bg-paper" aria-hidden="true" />}
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-soft">
                     {ticket.who}
@@ -80,14 +92,32 @@ export function FeedbackBoard({
                     </ul>
                   ) : null}
                 </div>
-                <form action={archiveFeedback}>
-                  <input type="hidden" name="kind" value={ticket.kind} />
-                  <input type="hidden" name="id" value={ticket.id} />
-                  {view === "archive" ? <input type="hidden" name="archived" value="0" /> : null}
-                  <button type="submit" className="nav-link text-sm text-ink/60">
-                    {view === "archive" ? labels.restore : labels.archiveAction}
-                  </button>
-                </form>
+                {view === "archive" ? (
+                  <form action={archiveFeedback}>
+                    <input type="hidden" name="kind" value={ticket.kind} />
+                    <input type="hidden" name="id" value={ticket.id} />
+                    <input type="hidden" name="archived" value="0" />
+                    <ConfirmSubmit
+                      label={labels.restore}
+                      title={labels.restoreAsk}
+                      message={labels.restoreLead}
+                      cancel={labels.cancel}
+                      className="nav-link text-sm text-ink/60"
+                    />
+                  </form>
+                ) : (
+                  <form action={archiveFeedback}>
+                    <input type="hidden" name="kind" value={ticket.kind} />
+                    <input type="hidden" name="id" value={ticket.id} />
+                    <ConfirmSubmit
+                      label={labels.archiveAction}
+                      title={labels.archiveAsk}
+                      message={labels.archiveLead}
+                      cancel={labels.cancel}
+                      className="nav-link text-sm text-ink/60"
+                    />
+                  </form>
+                )}
               </div>
             </li>
           ))}

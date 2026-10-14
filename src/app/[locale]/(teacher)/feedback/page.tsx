@@ -66,6 +66,11 @@ export default async function TeacherFeedbackPage() {
           archive: t("archive"),
           archiveAction: t("archiveAction"),
           restore: t("restore"),
+          restoreAsk: t("restoreAsk"),
+          restoreLead: t("restoreLead"),
+          archiveAsk: t("archiveAsk"),
+          archiveLead: t("archiveLead"),
+          cancel: t("cancel"),
         }}
       />
     </div>

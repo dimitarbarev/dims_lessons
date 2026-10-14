@@ -1,45 +1,61 @@
 import { getLocale, getTranslations } from "next-intl/server";
+import { ConfirmSubmit } from "@/components/confirm-submit";
 import { EmptyState } from "@/components/empty-state";
 import { primaryButton } from "@/components/fields";
 import { LessonButton } from "@/components/lesson-button";
 import { StatusLine } from "@/components/pack-dot";
 import { Link } from "@/i18n/navigation";
+import { restoreStudent } from "@/lib/actions";
 import { requireSession } from "@/lib/auth";
 import { getTeacherById, listClients } from "@/lib/db";
-import { formatMoney } from "@/lib/format";
 import { choiceOptions, labelOf } from "@/lib/labels";
-import { describeStats, urgency } from "@/lib/stats";
+import { describePack, type Tone } from "@/lib/stats";
 
-export default async function TodayPage() {
+export default async function TodayPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>;
+}) {
+  const query = await searchParams;
+  const archived = query.view === "archive";
   const session = await requireSession("teacher");
   const teacher = getTeacherById(session.user_id)!;
   const locale = await getLocale();
   const t = await getTranslations("today");
   const clientCopy = await getTranslations("client");
+  const common = await getTranslations("common");
   const status = await getTranslations("status");
   const options = await choiceOptions();
-  const clients = listClients(teacher.id).sort((a, b) => {
-    const rank = urgency(a.stats) - urgency(b.stats);
-    if (rank !== 0) return rank;
-    return a.name.localeCompare(b.name);
+  const clients = listClients(teacher.id, archived ? "archived" : "active").sort((a, b) => {
+    const left = packRank(describePack(a.billing_mode, a.stats, packText(status)).tone);
+    const right = packRank(describePack(b.billing_mode, b.stats, packText(status)).tone);
+    if (left !== right) return left - right;
+    return a.name.localeCompare(b.name, locale);
   });
-  const money = (cents: number) => formatMoney(cents, teacher.currency, locale);
 
   return (
     <div>
       <p className="kicker">{t("kicker")}</p>
       <div className="mt-2 mb-6 flex flex-wrap items-end justify-between gap-3">
         <h1 className="font-display text-4xl sm:text-5xl">{t("title")}</h1>
-        <Link className={primaryButton} href="/clients/new">
-          {t("add")}
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href={archived ? "/today" : "/today?view=archive"} className="nav-link text-sm text-ink/70">
+            {archived ? t("active") : t("archive")}
+          </Link>
+          {archived ? null : (
+            <Link className={primaryButton} href="/clients/new">
+              {t("add")}
+            </Link>
+          )}
+        </div>
       </div>
+      {archived ? <p className="mb-4 text-sm font-semibold text-soft">{t("archive")}</p> : null}
       {clients.length === 0 ? (
-        <EmptyState title={t("emptyTitle")} lead={t("emptyLead")} />
+        <EmptyState title={archived ? t("emptyArchive") : t("emptyTitle")} lead={archived ? t("emptyArchiveLead") : t("emptyLead")} />
       ) : (
         <ul className="space-y-3">
           {clients.map((client, index) => {
-            const described = describeStats(client.stats, (key, values) => status(key as "leftOne", values as never), money);
+            const described = describePack(client.billing_mode, client.stats, packText(status));
             return (
               <li
                 key={client.id}
@@ -54,17 +70,39 @@ export default async function TodayPage() {
                   </p>
                   <StatusLine text={described.text} tone={described.tone} />
                 </Link>
-                <LessonButton
-                  clientId={client.id}
-                  label={t("lesson")}
-                  savedLabel={t("saved")}
-                  title={t("lengthTitle")}
-                  lead={t("lengthLead")}
-                  otherLabel={t("otherLength")}
-                  hoursLabel={t("hoursLabel")}
-                  saveLabel={t("lesson")}
-                  closeLabel={clientCopy("close")}
-                />
+                {archived ? (
+                  <form action={restoreStudent}>
+                    <input type="hidden" name="clientId" value={client.id} />
+                    <ConfirmSubmit
+                      label={t("restore")}
+                      title={clientCopy("restoreAsk")}
+                      message={clientCopy("restoreLead")}
+                      cancel={clientCopy("cancel")}
+                      className={primaryButton}
+                    />
+                  </form>
+                ) : (
+                  <LessonButton
+                    clientId={client.id}
+                    label={t("lesson")}
+                    savedLabel={t("saved")}
+                    title={t("lengthTitle")}
+                    lead={t("lengthLead")}
+                    otherLabel={t("otherLength")}
+                    hoursLabel={t("hoursLabel")}
+                    saveLabel={t("lesson")}
+                    closeLabel={clientCopy("close")}
+                    platformLabel={clientCopy("platform")}
+                    placeLabel={clientCopy("place")}
+                    materialsLabel={clientCopy("materials")}
+                    homeworkLabel={clientCopy("homework")}
+                    optionalLabel={common("optional")}
+                    platforms={options.platforms}
+                    places={options.locations}
+                    defaultPlatform={client.platform_default}
+                    defaultPlace={client.location_default}
+                  />
+                )}
               </li>
             );
           })}
@@ -72,4 +110,15 @@ export default async function TodayPage() {
       )}
     </div>
   );
+}
+
+function packText(status: Awaited<ReturnType<typeof getTranslations<"status">>>) {
+  return (key: string, values?: Record<string, string | number>) => status(key as "settled", values as never);
+}
+
+function packRank(tone: Tone) {
+  if (tone === "empty") return 0;
+  if (tone === "low") return 1;
+  if (tone === "ok") return 2;
+  return 3;
 }

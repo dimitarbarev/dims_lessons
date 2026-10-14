@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import { BillingFields } from "@/components/billing-fields";
 import { ErrorBanner } from "@/components/error-banner";
 import { Area, Field, primaryButton, SelectField } from "@/components/fields";
 import { Link } from "@/i18n/navigation";
@@ -29,12 +30,26 @@ export default async function NewClientPage({
         <Field label={t("name")} name="name" required />
         <div className="grid gap-4 sm:grid-cols-2">
           <SelectField label={t("kind")} name="kind" defaultValue="child" options={options.kinds} />
+          <SelectField
+            label={t("portrait")}
+            name="portrait"
+            defaultValue="girl"
+            options={[
+              { value: "girl", label: t("girl") },
+              { value: "boy", label: t("boy") },
+            ]}
+          />
           <SelectField label={t("subject")} name="subject" defaultValue="math" options={options.subjects} />
           <SelectField label={t("platform")} name="platform" defaultValue="paper" options={options.platforms} />
           <SelectField label={t("place")} name="location" defaultValue="in_person" options={options.locations} />
-          <Field label={t("price")} name="price" defaultValue="0" type="text" inputMode="decimal" />
-          <SelectField label={t("billing")} name="billing" defaultValue="per_lesson" options={options.billing} />
-          <Field label={t("packSize")} name="packSize" defaultValue="0" type="text" inputMode="numeric" />
+          <BillingFields
+            billingLabel={t("billing")}
+            priceLabel={t("price")}
+            priceHourLabel={t("priceHour")}
+            packLessonsLabel={t("packSize")}
+            packHoursLabel={t("packHours")}
+            options={options.billing.filter((option) => option.value === "per_lesson" || option.value === "per_hour")}
+          />
           <Field label={t("amountNow")} name="amountNow" defaultValue="0" type="text" inputMode="decimal" />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">

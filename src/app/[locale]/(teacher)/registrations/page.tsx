@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import { ConfirmSubmit } from "@/components/confirm-submit";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorBanner } from "@/components/error-banner";
 import { butterButton, primaryButton } from "@/components/fields";
@@ -52,9 +53,13 @@ export default async function RegistrationsPage({
           </form>
           <form action={declineRegistration}>
             <input type="hidden" name="id" value={row.id} />
-            <button className={butterButton} type="submit">
-              {t("decline")}
-            </button>
+            <ConfirmSubmit
+              label={t("decline")}
+              title={t("declineAsk")}
+              message={t("declineLead")}
+              cancel={client("cancel")}
+              className={butterButton}
+            />
           </form>
         </div>
       </div>,

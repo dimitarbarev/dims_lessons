@@ -92,136 +92,44 @@ h3 {
 }
 
 .mood {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 2.6rem;
-  height: 2.6rem;
-  perspective: 180px;
+  display: block;
+  width: 5.25rem;
+  line-height: 0;
 }
 
 .mood-sm {
-  width: 1.7rem;
-  height: 1.7rem;
+  width: 2.7rem;
 }
 
-.mood-body {
-  position: relative;
-  transform-style: preserve-3d;
+.mood-lg {
+  width: min(100%, 7rem);
 }
 
-.mood-quiet .mood-body {
-  width: 58%;
-  height: 42%;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #d9d4cc, #8d8880 70%);
-  animation: mood-breathe 3.2s ease-in-out infinite;
+.mood img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  transform-origin: 50% 70%;
 }
 
-.mood-uneven .mood-body {
-  width: 46%;
-  height: 70%;
-  border-radius: 40% 40% 46% 46%;
-  background: linear-gradient(160deg, #c4d7b8, #6e9a62);
-  transform: rotate(-18deg);
-  animation: mood-sway 2.8s ease-in-out infinite;
+.mood:hover img {
+  animation: mood-shake 0.42s ease-in-out infinite;
 }
 
-.mood-uneven .mood-body::before {
-  content: "";
-  position: absolute;
-  left: 38%;
-  bottom: 88%;
-  width: 2px;
-  height: 38%;
-  background: #6d8f62;
-}
-
-.mood-steady .mood-body {
-  width: 78%;
-  height: 54%;
-  transform: rotateX(18deg);
-  animation: mood-open 4s ease-in-out infinite;
-}
-
-.mood-steady .mood-body::before,
-.mood-steady .mood-body::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  width: 48%;
-  height: 100%;
-  background: linear-gradient(#fffdf8, #f3eadc);
-  box-shadow: inset 0 0 0 1px rgba(90, 62, 40, 0.18);
-}
-
-.mood-steady .mood-body::before {
-  left: 0;
-  border-radius: 2px 0 0 2px;
-  transform-origin: right center;
-}
-
-.mood-steady .mood-body::after {
-  right: 0;
-  border-radius: 0 2px 2px 0;
-  transform-origin: left center;
-}
-
-.mood-bright .mood-body {
-  width: 42%;
-  height: 48%;
-  border-radius: 4px 4px 8px 8px;
-  background: linear-gradient(#f3d5a0, #e07a4c);
-  box-shadow: 0 0 12px 4px rgba(224, 122, 76, 0.45);
-  animation: mood-flicker 2.2s ease-in-out infinite;
-}
-
-.mood-bright .mood-body::before {
-  content: "";
-  position: absolute;
-  left: 18%;
-  top: -28%;
-  width: 64%;
-  height: 28%;
-  border-radius: 2px 2px 0 0;
-  background: #c4623a;
-}
-
-.mood-glad .mood-body {
-  width: 46%;
-  height: 46%;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #fff6d8, #f3d5a0 45%, #e07a4c);
-  animation: mood-spin 8s linear infinite;
-}
-
-.mood-glad .mood-body::before {
-  content: "";
-  position: absolute;
-  inset: -45%;
-  background: repeating-conic-gradient(from 0deg, rgba(224, 122, 76, 0.7) 0 8deg, transparent 8deg 24deg);
-  mask: radial-gradient(circle, transparent 42%, #000 46%, #000 58%, transparent 62%);
-}
-
-@keyframes mood-breathe {
-  50% { transform: scale(0.86); opacity: 0.7; }
-}
-
-@keyframes mood-sway {
-  50% { transform: rotate(14deg); }
-}
-
-@keyframes mood-open {
-  50% { transform: rotateX(28deg) scale(1.04); }
-}
-
-@keyframes mood-flicker {
-  40% { box-shadow: 0 0 6px 1px rgba(224, 122, 76, 0.25); }
-  70% { box-shadow: 0 0 16px 6px rgba(243, 213, 160, 0.7); }
-}
-
-@keyframes mood-spin {
-  to { transform: rotate(1turn); }
+@keyframes mood-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-3px) rotate(-3deg);
+  }
+  75% {
+    transform: translateX(3px) rotate(3deg);
+  }
 }
 
 .field {
@@ -1050,7 +958,7 @@ h3 {
   .doodle,
   .doodle .ink,
   .nav-badge,
-  .mood-body {
+  .mood:hover img {
     animation: none;
   }
 
