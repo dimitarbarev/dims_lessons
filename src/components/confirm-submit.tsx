@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useEscape } from "@/components/use-escape";
 
 export function ConfirmSubmit({
   label,
@@ -20,14 +21,7 @@ export function ConfirmSubmit({
   const opener = useRef<HTMLButtonElement>(null);
   const titleId = useId();
 
-  useEffect(() => {
-    if (!open) return;
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  useEscape(open, () => setOpen(false), 2);
 
   function commit() {
     const form = opener.current?.closest("form");

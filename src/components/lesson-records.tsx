@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { Area, butterButton, Field, primaryButton, SelectField } from "@/components/fields";
 import { removeLesson, updateLessonAction } from "@/lib/actions";
+import { useEscape } from "@/components/use-escape";
 
 type Choice = { value: string; label: string };
 
@@ -52,6 +53,7 @@ export function LessonRecords({
   };
 }) {
   const [editing, setEditing] = useState<string | null>(null);
+  useEscape(editing !== null, () => setEditing(null), 1);
   if (lessons.length === 0) return <p className="text-soft">{emptyLabel}</p>;
 
   return (
@@ -94,11 +96,11 @@ export function LessonRecords({
                 <p className="text-sm text-soft">{lesson.meta}</p>
                 <p className="mt-2 text-sm">
                   <span className="text-soft">{labels.materials}. </span>
-                  {lesson.materials || labels.materialsPlaceholder}
+                  {lesson.materials.trim() || " - "}
                 </p>
                 <p className="mt-1 text-sm">
                   <span className="text-soft">{labels.homework}. </span>
-                  {lesson.homework || labels.homeworkPlaceholder}
+                  {lesson.homework.trim() || " - "}
                 </p>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-2">

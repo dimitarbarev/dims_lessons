@@ -5,12 +5,14 @@ import { ConfirmSubmit } from "@/components/confirm-submit";
 import { butterButton, primaryButton } from "@/components/fields";
 import { MoodMark } from "@/components/mood-mark";
 import { archiveFeedback } from "@/lib/actions";
+import { useEscape } from "@/components/use-escape";
 
 export type FeedbackItem = {
   id: string;
   kind: "note" | "request";
   who: string;
   date: string;
+  lesson?: string;
   title: string;
   body: string;
   waiting: boolean;
@@ -48,6 +50,12 @@ export function StudentFeedback({
   const [showArchive, setShowArchive] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const shown = showArchive ? archived : items;
+
+  useEscape(asking || showArchive || openId !== null, () => {
+    if (openId) setOpenId(null);
+    else if (asking) setAsking(false);
+    else setShowArchive(false);
+  }, 1);
 
   return (
     <div className="space-y-4">
@@ -87,6 +95,7 @@ export function StudentFeedback({
                   {item.who} · {item.date}
                   {item.waiting ? <span className="ml-2 text-sm font-semibold text-soft">{labels.waiting}</span> : null}
                 </p>
+                {item.lesson ? <p className="mt-1 text-sm font-bold text-soft">{item.lesson}</p> : null}
                 <p className="mt-1">{item.title}</p>
               </button>
               {open ? (

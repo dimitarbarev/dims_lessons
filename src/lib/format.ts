@@ -4,6 +4,18 @@ export function todayISO() {
   return local.toISOString().slice(0, 10);
 }
 
+export function lessonWhen(
+  occurredOn: string | null,
+  subject: string | null,
+  locale: string,
+  subjectLabel: (value: string) => string,
+) {
+  if (!occurredOn) return "";
+  const day = formatDay(occurredOn, locale);
+  const name = subject ? subjectLabel(subject) : "";
+  return name ? `${day} · ${name}` : day;
+}
+
 export function formatDay(iso: string, locale: string) {
   return new Intl.DateTimeFormat(locale === "bg" ? "bg-BG" : "en-GB", {
     day: "numeric",

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useEscape } from "@/components/use-escape";
 
 const GRAVITY = 1450;
 const FLAP = -520;
@@ -31,6 +32,8 @@ export function BroomFlight() {
     setLeaving(true);
     window.setTimeout(() => setOpen(false), 320);
   };
+
+  useEscape(open, () => closeRef.current());
 
   useEffect(() => {
     const openGame = () => {
@@ -117,10 +120,6 @@ export function BroomFlight() {
     flapRef.current = flap;
 
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        closeRef.current();
-        return;
-      }
       if (event.key === " " || event.key === "ArrowUp") {
         event.preventDefault();
         flap();

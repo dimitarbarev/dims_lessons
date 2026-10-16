@@ -10,6 +10,7 @@ export type FeedbackTicket = {
   kind: "request" | "note";
   who: string;
   about: string;
+  lesson?: string;
   title: string;
   body: string;
   date: string;
@@ -18,18 +19,18 @@ export type FeedbackTicket = {
 };
 
 export function FeedbackBoard({
-  sent,
+  pending,
   received,
   archived,
   labels,
-  emptyTitle,
-  emptyLead,
+  empty,
+  pendingEmpty,
 }: {
-  sent: FeedbackTicket[];
+  pending: FeedbackTicket[];
   received: FeedbackTicket[];
   archived: FeedbackTicket[];
   labels: {
-    sent: string;
+    pending: string;
     received: string;
     archive: string;
     archiveAction: string;
@@ -40,23 +41,24 @@ export function FeedbackBoard({
     archiveLead: string;
     cancel: string;
   };
-  emptyTitle: string;
-  emptyLead: string;
+  empty: { title: string; lead: string };
+  pendingEmpty: { title: string; lead: string };
 }) {
-  const [view, setView] = useState<"sent" | "received" | "archive">("received");
-  const lists = { sent, received, archive: archived };
+  const [view, setView] = useState<"pending" | "received" | "archive">("received");
+  const lists = { pending, received, archive: archived };
   const tickets = lists[view];
+  const blank = view === "pending" ? pendingEmpty : empty;
 
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center gap-3">
-        <Tab pressed={view === "sent"} onClick={() => setView("sent")}>
-          {labels.sent}
-          <Count n={sent.length} />
-        </Tab>
         <Tab pressed={view === "received"} onClick={() => setView("received")}>
           {labels.received}
           <Count n={received.length} />
+        </Tab>
+        <Tab pressed={view === "pending"} onClick={() => setView("pending")}>
+          {labels.pending}
+          <Count n={pending.length} />
         </Tab>
         <button type="button" className={`nav-link ml-auto text-sm ${view === "archive" ? "text-ink" : "text-ink/60"}`} aria-pressed={view === "archive"} onClick={() => setView("archive")}>
           {labels.archive}
@@ -65,8 +67,8 @@ export function FeedbackBoard({
       </div>
       {tickets.length === 0 ? (
         <div className="rounded-[28px] bg-ivory px-5 py-8 shadow-card">
-          <h2 className="font-display text-3xl">{emptyTitle}</h2>
-          <p className="mt-2 text-soft">{emptyLead}</p>
+          <h2 className="font-display text-3xl">{blank.title}</h2>
+          <p className="mt-2 text-soft">{blank.lead}</p>
         </div>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
@@ -79,6 +81,7 @@ export function FeedbackBoard({
                     {ticket.who}
                     {ticket.about ? ` · ${ticket.about}` : ""} · {ticket.date}
                   </p>
+                  {ticket.lesson ? <p className="mt-1 text-sm font-bold">{ticket.lesson}</p> : null}
                   <h2 className="mt-1 font-display text-2xl leading-tight">{ticket.title}</h2>
                   {ticket.body ? <p className="mt-2 text-sm">{ticket.body}</p> : null}
                   {ticket.scores.length > 0 ? (

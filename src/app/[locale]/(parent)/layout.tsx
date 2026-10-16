@@ -29,6 +29,7 @@ export default async function ParentLayout({
       items={[
         { href: "/family", label: t("home"), match: "exact" },
         { href: "/family/feedback", label: t("feedback"), match: "exact" },
+        { href: "/family/payments", label: t("payments"), match: "exact" },
       ]}
     >
       {children}

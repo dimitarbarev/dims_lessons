@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { primaryButton } from "@/components/fields";
+import { useEscape } from "@/components/use-escape";
 
 export function StudentProfile({
   portrait,
@@ -23,6 +24,7 @@ export function StudentProfile({
   footer: ReactNode;
 }) {
   const [editing, setEditing] = useState(Boolean(startEditing));
+  useEscape(editing, () => setEditing(false), 1);
   const src = portrait === "boy" ? "/portrait-boy.jpg" : "/portrait-girl.jpg";
 
   return (

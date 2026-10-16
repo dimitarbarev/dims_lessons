@@ -20,7 +20,7 @@ This is that practice, digitized, so I can help myself, my students, and their p
 
 **The student.** What was studied, and the homework waiting, under their own sign-in.
 
-A parent can register a child. Nothing is opened until the teacher confirms it. The studio speaks English and Bulgarian.
+A parent can register a student. Nothing is opened until the teacher confirms it. The studio speaks English and Bulgarian.
 
 ![After class, one card on the table between teacher and student](docs/images/after-class.jpg)
 

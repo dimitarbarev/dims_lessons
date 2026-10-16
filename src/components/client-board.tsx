@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEscape } from "@/components/use-escape";
 
-export type PanelId = "lesson" | "payments" | "lessons" | "profile" | "pin" | "parents" | "feedback";
+export type PanelId = "lesson" | "payments" | "lessons" | "profile" | "parents" | "feedback";
 
 export type WidgetSize = "hero" | "wide" | "tile";
 export type WidgetTone = "feature" | "blush" | "plain";
@@ -15,6 +16,9 @@ export type WidgetModel = {
   figure: string;
   caption: string;
   detail?: string;
+  meta?: string;
+  lines?: { label: string; value: string; emphasis?: boolean }[];
+  notes?: string[];
   tone: WidgetTone;
   size: WidgetSize;
   display: "stat" | "story";
@@ -61,24 +65,6 @@ export function ClientBoard({
   const closeRef = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
 
-  useEffect(() => {
-    if (!panel) return;
-    closeRef.current?.focus();
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setPanel(null);
-        returnFocus.current?.focus();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [panel]);
-
   function open(next: PanelId, trigger: HTMLElement) {
     returnFocus.current = trigger;
     setPanel(next);
@@ -88,6 +74,18 @@ export function ClientBoard({
     setPanel(null);
     returnFocus.current?.focus();
   }
+
+  useEscape(panel !== null, close);
+
+  useEffect(() => {
+    if (!panel) return;
+    closeRef.current?.focus();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [panel]);
 
   return (
     <div>
@@ -110,6 +108,17 @@ export function ClientBoard({
                   {widget.figure}
                 </p>
               )}
+              {widget.meta ? <p className="mt-3 text-sm text-soft">{widget.meta}</p> : null}
+              {widget.lines && widget.lines.length > 0 ? (
+                <dl className="mt-4 space-y-3">
+                  {widget.lines.map((line) => (
+                    <div key={line.label}>
+                      <dt className="text-sm text-soft">{line.label}</dt>
+                      <dd className={`text-sm ${line.emphasis ? "font-semibold" : ""}`}>{line.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : null}
               {widget.caption ? (
                 <p className="mt-3 flex items-center gap-2 text-sm text-ink/80">
                   {widget.status ? (
@@ -118,7 +127,12 @@ export function ClientBoard({
                   <span className="line-clamp-2">{widget.caption}</span>
                 </p>
               ) : null}
-              {widget.detail ? <p className="mt-auto pt-6 text-sm text-soft">{widget.detail}</p> : null}
+              {widget.detail ? <p className={`${widget.lines ? "mt-4" : "mt-auto pt-6"} text-sm text-soft`}>{widget.detail}</p> : null}
+              {widget.notes?.map((note) => (
+                <p key={note} className="mt-1 text-sm text-soft">
+                  {note}
+                </p>
+              ))}
               <span
                 aria-hidden="true"
                 className="absolute top-4 right-4 grid size-8 place-items-center rounded-full bg-ivory text-ink shadow-card transition group-hover:bg-ink group-hover:text-paper"

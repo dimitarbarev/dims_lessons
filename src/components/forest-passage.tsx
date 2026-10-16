@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
+import { useEscape } from "@/components/use-escape";
 
 const TRAVEL_MS = 5600;
 const FADE_MS = 280;
@@ -25,6 +26,8 @@ export function ForestPassage() {
     router.push("/");
     window.setTimeout(() => setOpen(false), FADE_MS);
   };
+
+  useEscape(open, () => leaveRef.current());
 
   useEffect(() => {
     const openPassage = () => {

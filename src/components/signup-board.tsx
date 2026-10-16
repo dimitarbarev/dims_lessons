@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { useEscape } from "@/components/use-escape";
 
 export type SignupCard = {
   id: string;
@@ -19,6 +20,8 @@ export function SignupBoard({
   panels: Record<string, ReactNode>;
 }) {
   const [open, setOpen] = useState<string | null>(null);
+
+  useEscape(open !== null, () => setOpen(null));
 
   return (
     <>

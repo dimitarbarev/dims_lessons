@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "@/i18n/navigation";
 import { logQuickLesson } from "@/lib/actions";
+import { useEscape } from "@/components/use-escape";
 
 const PRESETS = [1, 1.5, 2] as const;
 
@@ -63,6 +64,8 @@ export function LessonButton({
   const [pending, start] = useTransition();
   const router = useRouter();
 
+  useEscape(open, () => setOpen(false));
+
   function hours() {
     if (choice !== "other") return choice;
     const parsed = Number(custom.replace(",", "."));
@@ -102,16 +105,15 @@ export function LessonButton({
       </button>
       {open
         ? createPortal(
-            <div className="fixed inset-0 z-40">
-              <button type="button" className="absolute inset-0 bg-ink/30 backdrop-blur-[2px]" aria-label={closeLabel} onClick={() => setOpen(false)} />
-              <div className="pointer-events-none relative flex h-full items-end justify-center p-3 sm:items-center sm:p-8">
+            <div className="fixed inset-0 z-40 overflow-y-auto">
+              <button type="button" className="fixed inset-0 bg-ink/30 backdrop-blur-[2px]" aria-label={closeLabel} onClick={() => setOpen(false)} />
+              <div className="pointer-events-none relative flex min-h-full items-end justify-center p-3 sm:items-center sm:p-8">
                 <div
                   role="dialog"
                   aria-modal="true"
                   aria-labelledby={`length-${clientId}`}
-                  className="rise pointer-events-auto flex max-h-[min(40rem,calc(100dvh-1.5rem))] w-full max-w-md flex-col rounded-[28px] bg-ivory p-5 shadow-card"
+                  className="rise pointer-events-auto w-full max-w-xl rounded-[28px] bg-ivory p-6 shadow-card sm:p-7"
                 >
-                  <div className="overflow-y-auto">
                   <h2 id={`length-${clientId}`} className="font-display text-3xl">
                     {title}
                   </h2>
@@ -169,7 +171,6 @@ export function LessonButton({
                         onChange={(event) => setHomework(event.target.value)}
                       />
                     </label>
-                  </div>
                   </div>
                   <div className="mt-5 flex items-center justify-between gap-3">
                     <button type="button" className="nav-link text-sm text-ink/70" onClick={() => setOpen(false)}>

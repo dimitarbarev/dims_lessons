@@ -85,6 +85,7 @@ create table if not exists feedback_notes (
   id uuid primary key default gen_random_uuid(),
   parent_id uuid not null references profiles (id) on delete cascade,
   client_id uuid references clients (id) on delete cascade,
+  lesson_id uuid references lessons (id) on delete set null,
   body text not null,
   created_at timestamptz not null default now()
 );

@@ -10,6 +10,7 @@
     "feedback": "Feedback",
     "settings": "Settings",
     "home": "Home",
+    "payments": "Payments",
     "signOut": "Sign out"
   },
   "welcome": {
@@ -24,7 +25,9 @@
   "game": {
     "fly": "Tap to fly",
     "again": "Tap to try again",
-    "leave": "Close"
+    "leave": "Close",
+    "catch": "Move to catch the coins",
+    "missed": "A coin reached the ground"
   },
   "auth": {
     "signInTitle": "Sign in",
@@ -68,7 +71,7 @@
     "social": "Social media",
     "occupation": "Occupation",
     "occupationHint": "A field or a job, whichever is easier.",
-    "childName": "Child's name",
+    "childName": "Student's name",
     "portrait": "Portrait",
     "girl": "Girl",
     "boy": "Boy",
@@ -91,7 +94,11 @@
   "platforms": {
     "paper": "Paper",
     "notes": "Notes",
-    "physical": "Physical writing"
+    "physical": "Physical writing",
+    "whiteboard": "Whiteboard",
+    "tablet": "Tablet",
+    "other_digital": "Other digital",
+    "mixed": "Mixed"
   },
   "locations": {
     "in_person": "In person",
@@ -103,8 +110,8 @@
     "prepaid": "Prepaid pack"
   },
   "kind": {
-    "child": "Child",
-    "adult": "Adult"
+    "student": "Student",
+    "parent": "Parent"
   },
   "status": {
     "leftOne": "1 left",
@@ -196,8 +203,17 @@
     "lessonsAdded": "Lessons this payment adds",
     "hoursAdded": "Hours this payment adds",
     "savePayment": "Save payment",
+    "suggestLesson": "Suggested from the agreed {price} per lesson.",
+    "suggestHour": "Suggested from the agreed {price} per hour.",
+    "changeDeal": "Change",
+    "dealTitle": "New agreement",
+    "dealLead": "Note whether the new deal is per lesson or per hour, and what the new price is.",
+    "dealSave": "Note the deal",
+    "addedLessons": "+{count, plural, one {# lesson} other {# lessons}}",
+    "addedHours": "+{count, plural, one {# hour} other {# hours}}",
     "history": "Lessons",
     "payments": "Payments",
+    "total": "Total",
     "noLessons": "No lessons yet.",
     "noPayments": "No payments yet.",
     "remove": "Remove",
@@ -219,6 +235,8 @@
     "noParents": "No parent linked yet.",
     "addParent": "Link a parent",
     "link": "Link parent",
+    "removeParentAsk": "Remove this parent?",
+    "removeParentLead": "They stop seeing this student's lessons. Their own account stays.",
     "ask": "Ask for feedback",
     "question": "Open question",
     "sendRequest": "Send request",
@@ -280,15 +298,17 @@
     "decline": "Decline",
     "declineAsk": "Decline this signup?",
     "declineLead": "It leaves the waiting list.",
-    "child": "Child",
+    "child": "Student",
     "parent": "Parent"
   },
   "feedback": {
     "kicker": "07  Feedback",
     "title": "How the lessons feel",
     "emptyTitle": "No feedback yet",
-    "emptyLead": "Ask a parent from their child's page, or wait for a note.",
-    "sent": "Sent",
+    "emptyLead": "Ask a parent from their student's page, or wait for a note.",
+    "pending": "Pending",
+    "pendingEmptyTitle": "Nothing waiting",
+    "pendingEmptyLead": "Questions you have asked, and that have not been answered yet, show up here.",
     "received": "Received",
     "archive": "Archive",
     "archiveAction": "Archive",
@@ -318,6 +338,7 @@
     "saveNote": "Leave note",
     "request": "A question from Dimi",
     "yourNotes": "Notes you have left",
+    "aboutLesson": "About the lesson on {when}",
     "answered": "Answered",
     "waiting": "Waiting",
     "defaultQuestion": "What should I change?",
@@ -341,17 +362,34 @@
     "cancel": "Cancel"
   },
   "parent": {
-    "kicker": "09  Your children",
+    "kicker": "09  Your students",
     "title": "Lessons",
     "emptyTitle": "No students linked yet",
     "emptyLead": "When a registration is confirmed, the lessons show up here.",
     "call": "Call",
     "teacher": "Teacher",
     "noPhone": "Your teacher has not added a phone number yet.",
+    "email": "Email",
+    "phone": "Phone",
+    "close": "Close",
+    "paymentsKicker": "Received",
+    "paymentsTitle": "Payments",
+    "paymentsLead": "What has already come in for your students.",
+    "paymentsEmpty": "No payments yet",
+    "paymentsEmptyLead": "When a payment is recorded, it will be listed here.",
+    "addedLessons": "+{count, plural, one {# lesson} other {# lessons}}",
+    "addedHours": "+{count, plural, one {# hour} other {# hours}}",
+    "hours": "{count} h",
     "readOnly": "You can look, and you can leave feedback. Lessons stay as the teacher wrote them.",
     "code": "Your code",
     "homework": "Homework",
     "materials": "Materials",
+    "duration": "Length",
+    "giveFeedback": "Give feedback",
+    "feedbackTitle": "Feedback for this lesson",
+    "feedbackLead": "The teacher will see this with the lesson it belongs to.",
+    "feedbackSend": "Send feedback",
+    "feedbackSaved": "Feedback sent.",
     "noLessons": "No lessons yet.",
     "childLessons": "Lessons"
   },
@@ -359,6 +397,11 @@
     "kicker": "10  Your lessons",
     "title": "Homework and what you studied",
     "code": "Your code",
+    "teacher": "Teacher",
+    "email": "Email",
+    "phone": "Phone",
+    "noPhone": "No phone on this profile yet.",
+    "close": "Close",
     "todo": "To do",
     "history": "Lessons",
     "emptyTitle": "Nothing here yet",
@@ -366,7 +409,15 @@
     "noHomework": "No homework waiting.",
     "materials": "Materials",
     "homework": "Homework",
-    "hours": "{count} h"
+    "hours": "{count} h",
+    "wand": "Magic wand",
+    "doneAsk": "Have you finished this homework?",
+    "doneYes": "Yes",
+    "doneNo": "Not yet",
+    "doneWait": "Finish it first.",
+    "answerAsk": "What was the answer of the last task?",
+    "answerLabel": "Your answer",
+    "enter": "Enter"
   },
   "errors": {
     "required": "Add the missing required fields.",

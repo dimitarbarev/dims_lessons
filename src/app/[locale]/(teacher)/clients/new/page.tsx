@@ -29,7 +29,7 @@ export default async function NewClientPage({
       <form action={createClientAction} className="space-y-4 rounded-2xl bg-ivory p-5 shadow-card">
         <Field label={t("name")} name="name" required />
         <div className="grid gap-4 sm:grid-cols-2">
-          <SelectField label={t("kind")} name="kind" defaultValue="child" options={options.kinds} />
+          <SelectField label={t("kind")} name="kind" defaultValue="student" options={options.kinds} />
           <SelectField
             label={t("portrait")}
             name="portrait"

@@ -100,11 +100,14 @@ export type FeedbackNote = {
   id: string;
   parent_id: string;
   client_id: string | null;
+  lesson_id: string | null;
   body: string;
   created_at: string;
   archived: number;
   parent_name: string;
   client_name: string | null;
+  lesson_on: string | null;
+  lesson_subject: string | null;
 };
 
 export type FeedbackRequest = {
@@ -160,7 +163,7 @@ function openDatabase() {
       id TEXT PRIMARY KEY,
       teacher_id TEXT NOT NULL,
       name TEXT NOT NULL,
-      kind TEXT NOT NULL DEFAULT 'child',
+      kind TEXT NOT NULL DEFAULT 'student',
       subject_default TEXT NOT NULL DEFAULT 'math',
       platform_default TEXT NOT NULL DEFAULT 'paper',
       location_default TEXT NOT NULL DEFAULT 'in_person',
@@ -422,6 +425,7 @@ function ensureStudio() {
   ensureColumn("lessons", "duration_hours", "REAL NOT NULL DEFAULT 1");
   ensureColumn("registrations", "portrait", "TEXT NOT NULL DEFAULT 'girl'");
   ensureColumn("feedback_notes", "archived", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn("feedback_notes", "lesson_id", "TEXT");
   ensureColumn("feedback_requests", "archived", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn("teachers", "password_hash", "TEXT");
   ensureColumn("teachers", "password_salt", "TEXT");
@@ -433,6 +437,10 @@ function ensureStudio() {
   ensureColumn("clients", "password_hash", "TEXT");
   ensureColumn("clients", "password_salt", "TEXT");
   ensureColumn("registrations", "pays_self", "INTEGER NOT NULL DEFAULT 0");
+  globalForDb.lessonsDb?.exec(`
+    UPDATE clients SET kind = 'student' WHERE kind = 'child';
+    UPDATE clients SET kind = 'parent' WHERE kind = 'adult';
+  `);
   globalForDb.lessonsDb?.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS clients_student_email ON clients(student_email) WHERE student_email IS NOT NULL AND student_email != '';
     CREATE UNIQUE INDEX IF NOT EXISTS teachers_public_code ON teachers(public_code) WHERE public_code IS NOT NULL AND public_code != '';
@@ -466,7 +474,7 @@ function ensureStudio() {
     const id = insertClient({
       teacherId: teacher.id,
       name: studentAccount.name,
-      kind: "child",
+      kind: "student",
       subject: "math",
       platform: "paper",
       location: "in_person",
@@ -523,7 +531,7 @@ function ensureStudio() {
     const id = insertClient({
       teacherId: teacher.id,
       name: "Anna",
-      kind: "child",
+      kind: "student",
       subject: "english",
       platform: "notes",
       location: "online",
@@ -556,7 +564,7 @@ function ensureStudio() {
     const id = insertClient({
       teacherId: teacher.id,
       name: "Elena",
-      kind: "adult",
+      kind: "parent",
       subject: "math",
       platform: "paper",
       location: "in_person",
@@ -815,6 +823,10 @@ export function linkParent(clientId: string, parentId: string) {
   run("INSERT OR IGNORE INTO client_parents (client_id, parent_id) VALUES (?, ?)", clientId, parentId);
 }
 
+export function unlinkParent(clientId: string, parentId: string) {
+  run("DELETE FROM client_parents WHERE client_id = ? AND parent_id = ?", clientId, parentId);
+}
+
 export function parentLinkedTo(parentId: string, clientId: string) {
   return Boolean(
     one(
@@ -892,6 +904,10 @@ export function insertClient(input: {
     nowIso(),
   );
   return id;
+}
+
+export function setClientDeal(id: string, priceCents: number, billingMode: string) {
+  run("UPDATE clients SET price_cents = ?, billing_mode = ? WHERE id = ?", priceCents, billingMode, id);
 }
 
 export function updateClient(
@@ -1078,6 +1094,21 @@ export function listPayments(clientId: string) {
   );
 }
 
+export type ParentPayment = Payment & { client_name: string };
+
+export function listPaymentsForParent(parentId: string) {
+  return many<ParentPayment>(
+    `SELECT p.id, p.client_id, p.paid_on, p.amount_cents, p.lessons_added, p.hours_added, p.created_at,
+            c.name AS client_name
+     FROM payments p
+     JOIN clients c ON c.id = p.client_id
+     JOIN client_parents cp ON cp.client_id = c.id
+     WHERE cp.parent_id = ? AND c.status = 'active'
+     ORDER BY p.paid_on DESC, p.created_at DESC`,
+    parentId,
+  );
+}
+
 export function getPayment(id: string) {
   return one<Payment>("SELECT * FROM payments WHERE id = ?", id);
 }
@@ -1130,23 +1161,26 @@ export function pendingRegistrationCount() {
   return one<{ n: number }>("SELECT COUNT(*) AS n FROM registrations WHERE status = 'pending'")?.n ?? 0;
 }
 
-export function insertFeedbackNote(parentId: string, clientId: string | null, body: string) {
+export function insertFeedbackNote(parentId: string, clientId: string | null, body: string, lessonId: string | null = null) {
   run(
-    "INSERT INTO feedback_notes (id, parent_id, client_id, body, created_at) VALUES (?, ?, ?, ?, ?)",
+    "INSERT INTO feedback_notes (id, parent_id, client_id, lesson_id, body, created_at) VALUES (?, ?, ?, ?, ?, ?)",
     cryptoId(),
     parentId,
     clientId,
+    lessonId,
     body,
     nowIso(),
   );
 }
 
 const noteSelect = `
-  SELECT n.id, n.parent_id, n.client_id, n.body, n.created_at, n.archived,
-         p.name AS parent_name, c.name AS client_name
+  SELECT n.id, n.parent_id, n.client_id, n.lesson_id, n.body, n.created_at, n.archived,
+         p.name AS parent_name, c.name AS client_name,
+         l.occurred_on AS lesson_on, l.subject AS lesson_subject
   FROM feedback_notes n
   JOIN parents p ON p.id = n.parent_id
   LEFT JOIN clients c ON c.id = n.client_id
+  LEFT JOIN lessons l ON l.id = n.lesson_id
 `;
 
 export function listFeedbackNotes() {

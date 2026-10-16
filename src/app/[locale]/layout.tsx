@@ -5,6 +5,7 @@ import { getMessages, getTranslations, setRequestLocale } from "next-intl/server
 import { notFound } from "next/navigation";
 import { routing, type Locale } from "@/i18n/routing";
 import { BroomFlight } from "@/components/broom-flight";
+import { CoinRain } from "@/components/coin-rain";
 import { ForestPassage } from "@/components/forest-passage";
 import "../globals.css";
 
@@ -47,6 +48,7 @@ export default async function LocaleLayout({
           {children}
           <ForestPassage />
           <BroomFlight />
+          <CoinRain />
         </NextIntlClientProvider>
       </body>
     </html>

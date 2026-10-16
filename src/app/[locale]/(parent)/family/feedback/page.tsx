@@ -5,7 +5,8 @@ import { MoodScale } from "@/components/mood-mark";
 import { addFeedbackNote, answerRequest } from "@/lib/actions";
 import { requireSession } from "@/lib/auth";
 import { listClientsOfParent, listNotesForParent, listRequestsForParent } from "@/lib/db";
-import { formatDay } from "@/lib/format";
+import { formatDay, lessonWhen } from "@/lib/format";
+import { choiceOptions, labelOf } from "@/lib/labels";
 
 export default async function ParentFeedbackPage({
   searchParams,
@@ -17,6 +18,7 @@ export default async function ParentFeedbackPage({
   const locale = await getLocale();
   const t = await getTranslations("feedback");
   const settings = await getTranslations("settings");
+  const options = await choiceOptions();
   const children = listClientsOfParent(session.user_id);
   const notes = listNotesForParent(session.user_id);
   const requests = listRequestsForParent(session.user_id);
@@ -74,6 +76,13 @@ export default async function ParentFeedbackPage({
                 <p className="text-sm font-bold text-soft">
                   {note.client_name ?? t("family")} · {formatDay(note.created_at, locale)}
                 </p>
+                {note.lesson_on ? (
+                  <p className="mt-1 text-sm font-bold">
+                    {t("aboutLesson", {
+                      when: lessonWhen(note.lesson_on, note.lesson_subject, locale, (value) => labelOf(options.subjects, value)),
+                    })}
+                  </p>
+                ) : null}
                 <p className="mt-1">{note.body}</p>
               </li>
             ))}

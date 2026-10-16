@@ -9,12 +9,16 @@ import { LessonRecords } from "@/components/lesson-records";
 import { PhoneLink } from "@/components/phone-link";
 import { StudentFeedback, type FeedbackItem } from "@/components/student-feedback";
 import { StudentProfile } from "@/components/student-profile";
+import { PaymentSuggest } from "@/components/payment-suggest";
+import { PaymentTotal } from "@/components/payment-total";
+import { SavePaymentButton } from "@/components/save-payment";
 import { Link } from "@/i18n/navigation";
 import {
   addPayment,
   archiveStudent,
   linkParentAction,
   linkParentByCode,
+  unlinkParentAction,
   logDetailedLesson,
   markSelfPayer,
   removePayment,
@@ -34,7 +38,7 @@ import {
   listParentsOfClient,
   listPayments,
 } from "@/lib/db";
-import { formatCode, formatDay, formatMoney, todayISO } from "@/lib/format";
+import { formatCode, formatDay, formatMoney, lessonWhen, todayISO } from "@/lib/format";
 import { packFigure } from "@/lib/stats";
 import { choiceOptions, labelOf } from "@/lib/labels";
 
@@ -43,7 +47,7 @@ export default async function ClientPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; saved?: string; edit?: string; panel?: string }>;
+  searchParams: Promise<{ error?: string; saved?: string; edit?: string; panel?: string; paid?: string }>;
 }) {
   const { id } = await params;
   const query = await searchParams;
@@ -71,8 +75,10 @@ export default async function ClientPage({
     labelOf(options.locations, client.location_default),
   ].join(" · ");
   const latestLesson = lessons[0];
-  const latestPayment = payments[0];
-  const feedbackItems = feedbackFeed(requests, notes, locale, feedback);
+  const feedbackItems = feedbackFeed(requests, notes, locale, feedback, (note) => {
+    const when = lessonWhen(note.lesson_on, note.lesson_subject, locale, (value) => labelOf(options.subjects, value));
+    return when ? feedback("aboutLesson", { when }) : "";
+  });
   const currentFeedback = feedbackItems.filter((item) => !item.archived);
   const archivedFeedback = feedbackItems.filter((item) => item.archived);
   const latestFeedback = currentFeedback.find((item) => !item.waiting) ?? currentFeedback[0];
@@ -103,6 +109,7 @@ export default async function ClientPage({
     ...(client.grade ? [{ label: t("grade"), value: client.grade }] : []),
     ...(client.interests ? [{ label: t("interests"), value: client.interests }] : []),
     ...(client.ambitions ? [{ label: t("ambitions"), value: client.ambitions }] : []),
+    { label: t("pin"), value: client.student_pin_hash ? t("pinSet") : t("pinOff") },
   ];
 
   const widgets: WidgetModel[] = [
@@ -111,10 +118,23 @@ export default async function ClientPage({
       panel: "lesson",
       label: t("widgetLesson"),
       figure: latestLesson ? formatDay(latestLesson.occurred_on, locale) : "—",
-      caption: latestLesson
-        ? `${labelOf(options.subjects, latestLesson.subject)} · ${latestLesson.materials || t("materialsEmpty")}`
-        : t("noLessons"),
-      detail: latestLesson ? latestLesson.homework || t("homeworkEmpty") : t("widgetWrite"),
+      caption: latestLesson ? "" : t("noLessons"),
+      meta: latestLesson
+        ? [
+            t("hours", { count: latestLesson.duration_hours || 1 }),
+            labelOf(options.subjects, latestLesson.subject),
+            latestLesson.platform ? labelOf(options.platforms, latestLesson.platform) : "",
+            latestLesson.location ? labelOf(options.locations, latestLesson.location) : "",
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        : undefined,
+      lines: latestLesson
+        ? [
+            { label: t("materials"), value: latestLesson.materials.trim() || " - " },
+            { label: t("homework"), value: latestLesson.homework.trim() || " - ", emphasis: true },
+          ]
+        : undefined,
       tone: "feature",
       size: "hero",
       display: "stat",
@@ -129,7 +149,7 @@ export default async function ClientPage({
         (client.billing_mode === "per_lesson" || client.billing_mode === "per_hour") && client.price_cents === 0
           ? t("setPrice")
           : undefined,
-      tone: "plain",
+      tone: "blush",
       size: "wide",
       display: "stat",
       status: standing.status,
@@ -141,17 +161,7 @@ export default async function ClientPage({
       figure: String(lessons.length),
       caption: latestLesson ? latestLesson.materials || latestLesson.homework || formatDay(latestLesson.occurred_on, locale) : t("noLessons"),
       tone: "plain",
-      size: "tile",
-      display: "stat",
-    },
-    {
-      id: "payments",
-      panel: "payments",
-      label: t("widgetPayments"),
-      figure: money(client.stats.paidCents),
-      caption: latestPayment ? formatDay(latestPayment.paid_on, locale) : t("noPayments"),
-      tone: "blush",
-      size: "tile",
+      size: "wide",
       display: "stat",
     },
     {
@@ -161,6 +171,7 @@ export default async function ClientPage({
       figure: money(client.price_cents),
       caption: labelOf(options.billing, client.billing_mode),
       detail: profileBits || undefined,
+      notes: [client.student_pin_hash ? t("pinSet") : t("pinOff")],
       tone: "plain",
       size: "wide",
       display: "stat",
@@ -185,24 +196,14 @@ export default async function ClientPage({
       display: parents.length === 1 ? "story" : "stat",
     },
     {
-      id: "pin",
-      panel: "pin",
-      label: t("widgetPin"),
-      figure: client.student_pin_hash ? "●●●●" : "—",
-      caption: client.student_pin_hash ? t("pinSet") : t("pinOff"),
-      tone: "plain",
-      size: "tile",
-      display: "stat",
-    },
-    {
       id: "feedback",
       panel: "feedback",
       label: t("widgetFeedback"),
       figure: latestFeedback ? excerpt(latestFeedback.title) : t("noNotes"),
       caption: latestFeedback ? `${latestFeedback.who} · ${latestFeedback.date}` : parents.length === 0 ? t("needParent") : "",
       tone: "plain",
-      size: "wide",
-      display: "story",
+      size: "tile",
+      display: latestFeedback ? "story" : "stat",
     },
   ];
 
@@ -211,7 +212,6 @@ export default async function ClientPage({
     payments: t("receive"),
     lessons: t("history"),
     profile: t("profile"),
-    pin: t("pin"),
     parents: t("parents"),
     feedback: t("widgetFeedback"),
   };
@@ -255,11 +255,11 @@ export default async function ClientPage({
                   </p>
                   <p className="mt-2 text-sm">
                     <span className="text-soft">{t("materials")}. </span>
-                    {latestLesson.materials || t("materialsEmpty")}
+                    {latestLesson.materials.trim() || " - "}
                   </p>
                   <p className="mt-1 text-sm font-semibold">
                     <span className="font-normal text-soft">{t("homework")}. </span>
-                    {latestLesson.homework || t("homeworkEmpty")}
+                    {latestLesson.homework.trim() || " - "}
                   </p>
                 </div>
               ) : (
@@ -286,26 +286,39 @@ export default async function ClientPage({
           ),
           payments: (
             <div className="space-y-6">
-              {(client.billing_mode === "per_lesson" || client.billing_mode === "per_hour") && client.price_cents === 0 ? (
-                <p className="text-sm font-semibold text-apricot-deep">{t("setPrice")}</p>
-              ) : null}
               <form action={addPayment} className="grid gap-4 sm:grid-cols-2">
                 <input type="hidden" name="clientId" value={client.id} />
                 <Field label={t("date")} name="date" type="date" defaultValue={todayISO()} required />
-                <Field label={t("amount")} name="amount" defaultValue="0" inputMode="decimal" />
-                {client.billing_mode === "per_hour" ? (
-                  <Field label={t("hoursAdded")} name="hoursAdded" defaultValue="0" inputMode="decimal" />
-                ) : (
-                  <Field label={t("lessonsAdded")} name="lessonsAdded" defaultValue="0" inputMode="numeric" />
-                )}
+                <PaymentSuggest
+                  clientId={client.id}
+                  priceCents={client.price_cents}
+                  billingMode={client.billing_mode}
+                  amountLabel={t("amount")}
+                  lessonsLabel={t("lessonsAdded")}
+                  hoursLabel={t("hoursAdded")}
+                  priceLessonLabel={t("price")}
+                  priceHourLabel={t("priceHour")}
+                  hintLesson={t("suggestLesson", { price: "@@" })}
+                  hintHour={t("suggestHour", { price: "@@" })}
+                  locale={locale}
+                  currency={teacher.currency}
+                  changeLabel={t("changeDeal")}
+                  dealTitle={t("dealTitle")}
+                  dealLead={t("dealLead")}
+                  perLessonLabel={labelOf(options.billing, "per_lesson")}
+                  perHourLabel={labelOf(options.billing, "per_hour")}
+                  saveLabel={t("dealSave")}
+                  cancelLabel={t("cancel")}
+                />
                 <div className="justify-self-start sm:col-span-2">
-                  <button className={butterButton} type="submit">
-                    {t("savePayment")}
-                  </button>
+                  <SavePaymentButton label={t("savePayment")} celebrate={query.paid === "1"} />
                 </div>
               </form>
               <div>
-                <h3 className="mb-3 font-display text-2xl">{t("payments")}</h3>
+                <div className="mb-3 flex items-baseline justify-between gap-3">
+                  <h3 className="font-display text-2xl">{t("payments")}</h3>
+                  <PaymentTotal label={t("total")} amount={money(client.stats.paidCents)} />
+                </div>
                 {payments.length === 0 ? <p className="text-soft">{t("noPayments")}</p> : null}
                 <RecordList>
                   {payments.map((payment) => (
@@ -314,8 +327,8 @@ export default async function ClientPage({
                         <p className="font-bold">{formatDay(payment.paid_on, locale)}</p>
                         <p className="text-sm text-soft">
                           {money(payment.amount_cents)}
-                          {payment.hours_added ? ` · +${t("hours", { count: payment.hours_added })}` : ""}
-                          {payment.lessons_added ? ` · +${payment.lessons_added}` : ""}
+                          {payment.hours_added ? ` · ${t("addedHours", { count: payment.hours_added })}` : ""}
+                          {payment.lessons_added ? ` · ${t("addedLessons", { count: payment.lessons_added })}` : ""}
                         </p>
                       </div>
                       <form action={removePayment}>
@@ -366,6 +379,7 @@ export default async function ClientPage({
             />
           ),
           profile: (
+            <div>
             <StudentProfile
               portrait={portrait}
               name={client.name}
@@ -443,9 +457,8 @@ export default async function ClientPage({
                 </div>
               </form>
             </StudentProfile>
-          ),
-          pin: (
-            <form action={savePin} className="grid gap-4">
+            <form action={savePin} className="mt-8 grid gap-4 border-t border-ink/10 pt-6">
+              <h3 className="font-display text-2xl">{t("pin")}</h3>
               <p className="text-sm text-soft">{t("pinHint")}</p>
               <input type="hidden" name="clientId" value={client.id} />
               <Field label={t("pin")} name="pin" inputMode="numeric" />
@@ -459,6 +472,7 @@ export default async function ClientPage({
                 </button>
               </div>
             </form>
+            </div>
           ),
           parents: (
             <div className="space-y-6">
@@ -469,9 +483,12 @@ export default async function ClientPage({
                   {parents
                     .filter((parent) => parent.public_code === client.public_code)
                     .map((parent) => (
-                      <div key={parent.id} className="mt-2 text-sm">
-                        {parent.phone ? <PhoneLink phone={parent.phone} /> : null}
-                        {parent.email.endsWith("@lessons.local") ? null : <p className="text-soft">{parent.email}</p>}
+                      <div key={parent.id} className="mt-2 flex items-start justify-between gap-3 text-sm">
+                        <div>
+                          {parent.phone ? <PhoneLink phone={parent.phone} /> : null}
+                          {parent.email.endsWith("@lessons.local") ? null : <p className="text-soft">{parent.email}</p>}
+                        </div>
+                        <RemoveParent clientId={client.id} parentId={parent.id} t={t} />
                       </div>
                     ))}
                 </div>
@@ -491,17 +508,20 @@ export default async function ClientPage({
                 {parents
                   .filter((parent) => parent.public_code !== client.public_code)
                   .map((parent) => (
-                    <li key={parent.id} className="rounded-3xl bg-paper px-4 py-3">
-                      <p className="font-bold">{parent.name}</p>
-                      <p className="text-sm tracking-[0.16em] text-soft">{formatCode(parent.public_code)}</p>
-                      {parent.email.endsWith("@lessons.local") ? null : <p className="text-sm text-soft">{parent.email}</p>}
-                      {parent.phone ? (
-                        <p className="text-sm">
-                          <PhoneLink phone={parent.phone} />
-                        </p>
-                      ) : null}
-                      {parent.occupation ? <p className="text-sm">{parent.occupation}</p> : null}
-                      {parent.social ? <p className="text-sm">{parent.social}</p> : null}
+                    <li key={parent.id} className="flex items-start justify-between gap-3 rounded-3xl bg-paper px-4 py-3">
+                      <div>
+                        <p className="font-bold">{parent.name}</p>
+                        <p className="text-sm tracking-[0.16em] text-soft">{formatCode(parent.public_code)}</p>
+                        {parent.email.endsWith("@lessons.local") ? null : <p className="text-sm text-soft">{parent.email}</p>}
+                        {parent.phone ? (
+                          <p className="text-sm">
+                            <PhoneLink phone={parent.phone} />
+                          </p>
+                        ) : null}
+                        {parent.occupation ? <p className="text-sm">{parent.occupation}</p> : null}
+                        {parent.social ? <p className="text-sm">{parent.social}</p> : null}
+                      </div>
+                      <RemoveParent clientId={client.id} parentId={parent.id} t={t} />
                     </li>
                   ))}
               </RecordList>
@@ -512,7 +532,7 @@ export default async function ClientPage({
                   <input type="hidden" name="clientId" value={client.id} />
                   <Field label={t("linkCode")} name="code" hint={t("linkCodeHint")} inputMode="numeric" />
                   <div className="justify-self-start">
-                    <button className={butterButton} type="submit">
+                    <button className={primaryButton} type="submit">
                       {t("link")}
                     </button>
                   </div>
@@ -527,7 +547,7 @@ export default async function ClientPage({
                     <Field label={t("parentSocial")} name="parentSocial" />
                     <Field label={t("parentOccupation")} name="parentOccupation" />
                     <div className="justify-self-start sm:col-span-2">
-                      <button className={butterButton} type="submit">
+                      <button className={primaryButton} type="submit">
                         {t("link")}
                       </button>
                     </div>
@@ -585,6 +605,24 @@ export default async function ClientPage({
   );
 }
 
+function RemoveParent({
+  clientId,
+  parentId,
+  t,
+}: {
+  clientId: string;
+  parentId: string;
+  t: (key: "remove" | "removeParentAsk" | "removeParentLead" | "cancel") => string;
+}) {
+  return (
+    <form action={unlinkParentAction} className="shrink-0">
+      <input type="hidden" name="clientId" value={clientId} />
+      <input type="hidden" name="parentId" value={parentId} />
+      <ConfirmSubmit label={t("remove")} title={t("removeParentAsk")} message={t("removeParentLead")} cancel={t("cancel")} />
+    </form>
+  );
+}
+
 function RecordList({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <ul className={`space-y-3 ${className}`}>{children}</ul>;
 }
@@ -597,7 +635,7 @@ function excerpt(text: string) {
 
 function panelForError(error?: string): PanelId | null {
   if (error === "invalidAmount") return "payments";
-  if (error === "invalidPin") return "pin";
+  if (error === "invalidPin") return "profile";
   if (error === "unknownCode") return "parents";
   return null;
 }
@@ -641,7 +679,7 @@ function standingWidget(
   return { label: copy.balance, figure: String(pack.count), caption, status: pack.tone };
 }
 
-const panels = ["lesson", "payments", "lessons", "profile", "pin", "parents", "feedback"] as const;
+const panels = ["lesson", "payments", "lessons", "profile", "parents", "feedback"] as const;
 
 function isPanel(value?: string): value is PanelId {
   return panels.some((panel) => panel === value);
@@ -652,6 +690,7 @@ function feedbackFeed(
   notes: ReturnType<typeof listNotesForClient>,
   locale: string,
   feedback: (key: "pace" | "following" | "homework" | "overall", values?: Record<string, string | number>) => string,
+  aboutLesson: (note: ReturnType<typeof listNotesForClient>[number]) => string,
 ): (FeedbackItem & { archived: boolean; sort: string })[] {
   const fromRequests = requests.map((request) => ({
     id: request.id,
@@ -679,6 +718,7 @@ function feedbackFeed(
     who: note.parent_name,
     date: formatDay(note.created_at, locale),
     sort: note.created_at,
+    lesson: aboutLesson(note),
     title: note.body,
     body: "",
     waiting: false,

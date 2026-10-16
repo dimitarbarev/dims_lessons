@@ -36,8 +36,10 @@ import {
   insertFeedbackRequest,
   insertLesson,
   insertPayment,
+  setClientDeal,
   insertRegistration,
   linkParent,
+  unlinkParent,
   markPaysForSelf,
   parentLinkedTo,
   setClientStatus,
@@ -90,7 +92,7 @@ function choices(form: FormData) {
   const subject = field(form, "subject");
   const platform = field(form, "platform");
   const location = field(form, "location");
-  const kind = field(form, "kind") || "child";
+  const kind = field(form, "kind") || "student";
   const billing = field(form, "billing") || "per_lesson";
   if (
     !isOneOf(SUBJECTS, subject) ||
@@ -333,6 +335,15 @@ export async function removeLesson(form: FormData) {
   await go(`/clients/${lesson.client_id}`);
 }
 
+export async function noteDeal(clientId: string, billing: string, priceCents: number) {
+  const client = await ownedClient(clientId);
+  if (billing !== "per_lesson" && billing !== "per_hour") return;
+  if (!Number.isInteger(priceCents) || priceCents <= 0 || priceCents > 100_000_00) return;
+  if (client.price_cents === priceCents && client.billing_mode === billing) return;
+  setClientDeal(client.id, priceCents, billing);
+  refresh();
+}
+
 export async function addPayment(form: FormData) {
   const client = await ownedClient(field(form, "clientId"));
   const amount = parseMoney(field(form, "amount"));
@@ -341,9 +352,11 @@ export async function addPayment(form: FormData) {
     await go(`/clients/${client.id}`, { error: "invalidAmount" });
   }
   const cents = must(amount);
+  const billed = field(form, "billing");
+  const mode = billed === "per_hour" || billed === "per_lesson" || billed === "prepaid" ? billed : client.billing_mode;
   let lessonsAdded = 0;
   let hoursAdded = 0;
-  if (client.billing_mode === "per_hour") {
+  if (mode === "per_hour") {
     const hours = parsePackHours(field(form, "hoursAdded"));
     if (hours === null) await go(`/clients/${client.id}`, { error: "invalidAmount" });
     hoursAdded = must(hours);
@@ -355,6 +368,10 @@ export async function addPayment(form: FormData) {
   if (cents === 0 && lessonsAdded === 0 && hoursAdded === 0) {
     await go(`/clients/${client.id}`, { error: "invalidAmount" });
   }
+  const price = parseMoney(field(form, "price"));
+  if ((mode === "per_lesson" || mode === "per_hour") && price != null && price > 0) {
+    if (price !== client.price_cents || mode !== client.billing_mode) setClientDeal(client.id, price, mode);
+  }
   insertPayment({
     clientId: client.id,
     paidOn: date,
@@ -363,7 +380,7 @@ export async function addPayment(form: FormData) {
     hoursAdded,
   });
   refresh();
-  await go(`/clients/${client.id}`);
+  await go(`/clients/${client.id}`, { panel: "payments", paid: "1" });
 }
 
 export async function removePayment(form: FormData) {
@@ -429,12 +446,12 @@ export async function savePin(form: FormData) {
   } else {
     const pin = field(form, "pin");
     if (pin) {
-      if (!/^\d{4,6}$/.test(pin)) await go(`/clients/${client.id}`, { error: "invalidPin" });
+      if (!/^\d{4,6}$/.test(pin)) await go(`/clients/${client.id}`, { error: "invalidPin", panel: "profile" });
       setStudentPin(client.id, pin);
     }
   }
   refresh();
-  await go(`/clients/${client.id}`, { saved: "1" });
+  await go(`/clients/${client.id}`, { panel: "profile", saved: "1" });
 }
 
 export async function linkParentAction(form: FormData) {
@@ -471,6 +488,14 @@ export async function linkParentByCode(form: FormData) {
   await go(`/clients/${client.id}`, { saved: "1" });
 }
 
+export async function unlinkParentAction(form: FormData) {
+  const client = await ownedClient(field(form, "clientId"));
+  const parentId = field(form, "parentId");
+  if (parentId && parentLinkedTo(parentId, client.id)) unlinkParent(client.id, parentId);
+  refresh();
+  await go(`/clients/${client.id}`, { panel: "parents" });
+}
+
 export async function markSelfPayer(form: FormData) {
   const client = await ownedClient(field(form, "clientId"));
   markPaysForSelf(client.id);
@@ -488,7 +513,7 @@ export async function acceptRegistration(form: FormData) {
   const clientId = insertClient({
     teacherId: session.user_id,
     name: registration.child_name,
-    kind: "child",
+    kind: "student",
     subject: isOneOf(SUBJECTS, registration.subject) ? registration.subject : "math",
     platform: "paper",
     location: "in_person",
@@ -580,6 +605,21 @@ export async function addFeedbackNote(form: FormData) {
   insertFeedbackNote(session.user_id, clientId || null, body);
   refresh();
   await go("/family/feedback", { saved: "1" });
+}
+
+export async function addLessonFeedback(form: FormData) {
+  const session = await requireParent();
+  const clientId = field(form, "clientId");
+  const lessonId = field(form, "lessonId");
+  const body = field(form, "body");
+  const back = clientId ? `/family/${clientId}` : "/family";
+  if (!body || !clientId || !lessonId) await go(back, { error: "required" });
+  if (!parentLinkedTo(session.user_id, clientId)) await go("/family");
+  const lesson = getLesson(lessonId);
+  if (!lesson || lesson.client_id !== clientId) await go(back);
+  insertFeedbackNote(session.user_id, clientId, body, must(lesson).id);
+  refresh();
+  await go(back, { saved: "1" });
 }
 
 export async function answerRequest(form: FormData) {

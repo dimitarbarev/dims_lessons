@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { butterButton, Field, primaryButton, SelectField } from "@/components/fields";
 import { InviteLink } from "@/components/invite-link";
 import { PhoneLink } from "@/components/phone-link";
 import { saveSettings } from "@/lib/actions";
+import { useEscape } from "@/components/use-escape";
 
 export function SettingsView({
   teacher,
@@ -18,10 +19,19 @@ export function SettingsView({
 }) {
   const t = useTranslations("settings");
   const [editing, setEditing] = useState(startEditing);
+  const taps = useRef(0);
+  useEscape(editing, () => setEditing(false));
+
+  function tapWizard() {
+    taps.current += 1;
+    if (taps.current < 5) return;
+    taps.current = 0;
+    window.dispatchEvent(new Event("lessons:coins"));
+  }
 
   return (
     <div>
-      <div className="grove-frame" aria-hidden="true">
+      <button type="button" className="grove-frame" aria-label={teacher.name} onClick={tapWizard}>
         <img
           src="/grove.jpg"
           alt=""
@@ -30,7 +40,7 @@ export function SettingsView({
           draggable={false}
           className="grove-photo"
         />
-      </div>
+      </button>
       <div className="relative z-10 -mt-16 sm:-mt-20">
         <p className="kicker">{t("kicker")}</p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
